@@ -33,6 +33,7 @@ file(GLOB_RECURSE SOURCES
     src/*.c
     bsp/gowin/system/*.c
     drivers/src/*.c
+    kernel/*.c
 )
 
 file(GLOB STARTUP_SOURCES
@@ -55,6 +56,7 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
     bsp/gowin/core
     bsp/gowin/system
     drivers/inc
+    kernel
 )
 
 # --------------------------------------------------
