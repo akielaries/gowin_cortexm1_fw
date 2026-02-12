@@ -12,15 +12,11 @@
  */
 static THD_WORKING_AREA(blinker_thread_wa, 256);
 static THD_FUNCTION(blinker_thread, arg) {
-  thread_t *thread = (thread_t *)arg;
+  thread_t *thread = (thread_t *)arg; // needed for macros
   THD_BEGIN();
   while (1) {
-    bool key_pressed = ((GPIO_ReadBits(GPIO0) & GPIO_Pin_2) == 0);
-    uint32_t time    = key_pressed ? 250 : 500;
-
     GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
-
-    THD_SLEEP_MS(time);
+    THD_SLEEP_MS(500); // Fixed time
   }
   THD_END();
 }
@@ -28,15 +24,11 @@ static THD_FUNCTION(blinker_thread, arg) {
 // second blinker thread
 static THD_WORKING_AREA(blinker_thread_wa2, 256);
 static THD_FUNCTION(blinker_thread2, arg) {
-  thread_t *thread = (thread_t *)arg;
+  thread_t *thread = (thread_t *)arg; // needed for macros
   THD_BEGIN();
   while (1) {
-    bool key_pressed = ((GPIO_ReadBits(GPIO0) & GPIO_Pin_2) == 0);
-    uint32_t time    = key_pressed ? 50 : 100;
-
     GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
-
-    THD_SLEEP_MS(time);
+    THD_SLEEP_MS(100); // Fixed time
   }
   THD_END();
 }
