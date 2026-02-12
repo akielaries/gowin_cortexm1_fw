@@ -1,111 +1,156 @@
-/*
- ******************************************************************************************
- * @file      main.c
- * @author    GowinSemicoductor
- * @device    Gowin_EMPU_M1
- * @brief     Main function.
- ******************************************************************************************
- */
-
-/* Includes ------------------------------------------------------------------*/
-
 #include "GOWIN_M1.h"
 
+#include "debug.h"
 #include "gpio.h"
 #include "delay.h"
-
 #include "sys_defs.h"
-#include "GOWIN_M1_uart.h"
 
-void dbg_init(void)
-{
-	UART_InitTypeDef UART_InitStruct;
+/* ========================================================= */
+/* ================= MINI COOP KERNEL ====================== */
+/* ========================================================= */
 
-	UART_InitStruct.UART_BaudRate = 115200;
-	UART_InitStruct.UART_Mode.UARTMode_Tx = ENABLE;
-	UART_InitStruct.UART_Mode.UARTMode_Rx = ENABLE;
-	UART_InitStruct.UART_Int.UARTInt_Tx = DISABLE;
-	UART_InitStruct.UART_Int.UARTInt_Rx = DISABLE;
-	UART_InitStruct.UART_Ovr.UARTOvr_Tx = DISABLE;
-	UART_InitStruct.UART_Ovr.UARTOvr_Rx = DISABLE;
-	UART_InitStruct.UART_Hstm = DISABLE;
+#define MAX_THREADS 8
 
-	UART_Init(UART1, &UART_InitStruct);
+typedef struct {
+  void (*func)(void *);
+  void *arg;
+  uint32_t wake_time;
+  uint16_t lc; // line counter (state)
+  uint8_t active;
+} thread_t;
+
+static thread_t threads[MAX_THREADS];
+static uint32_t thread_count = 0;
+
+volatile uint32_t system_time_ms = 0;
+
+
+/* ---- Cooperative thread macros ---- */
+
+#define THD_WORKING_AREA(name, size) thread_t name
+
+#define THD_FUNCTION(name, arg) void name(void *arg)
+
+#define THD_BEGIN()                                                                                \
+  switch (thread->lc) {                                                                            \
+    case 0:
+
+#define THD_END()                                                                                  \
+  }                                                                                                \
+  thread->lc = 0;
+
+#define THD_SLEEP_MS(ms)                                                                           \
+  do {                                                                                             \
+    thread->wake_time = system_time_ms + (ms);                                                     \
+    thread->lc        = __LINE__;                                                                  \
+    return;                                                                                        \
+    case __LINE__:;                                                                                \
+  } while (0)
+
+/* ---- Thread creation ---- */
+
+thread_t *mkthread(thread_t *wa, size_t size, int prio, void (*func)(void *), void *arg) {
+  (void)size;
+  (void)prio;
+
+  if (thread_count >= MAX_THREADS)
+    return NULL;
+
+  wa->func      = func;
+  wa->arg       = arg;
+  wa->wake_time = 0;
+  wa->lc        = 0;
+  wa->active    = 1;
+
+  threads[thread_count++] = *wa;
+
+  return wa;
 }
 
+/*
+ * LED blinker "thread"
+ */
+static THD_WORKING_AREA(blinker_thread_wa, 256);
+static THD_FUNCTION(blinker_thread, arg) {
+  thread_t *thread = (thread_t *)arg;
+  THD_BEGIN();
+  while (1) {
+    bool key_pressed = ((GPIO_ReadBits(GPIO0) & GPIO_Pin_2) == 0);
+    uint32_t time    = key_pressed ? 250 : 500;
 
+    GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
 
-//delay
-void delay(__IO uint32_t nCount)
-{
-	for(; nCount != 0; nCount--);
+    THD_SLEEP_MS(time);
+  }
+  THD_END();
 }
 
+// second blinker thread
+static THD_WORKING_AREA(blinker_thread_wa2, 256);
+static THD_FUNCTION(blinker_thread2, arg) {
+  thread_t *thread = (thread_t *)arg;
+  THD_BEGIN();
+  while (1) {
+    bool key_pressed = ((GPIO_ReadBits(GPIO0) & GPIO_Pin_2) == 0);
+    uint32_t time    = key_pressed ? 50 : 100;
 
-/**
-  * @brief  Main program.
-  * @param  None
-  * @retval None
-  */
+    GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
+
+    THD_SLEEP_MS(time);
+  }
+  THD_END();
+}
+
+// second blinker thread
+static THD_WORKING_AREA(print_thread_wa, 256);
+static THD_FUNCTION(print_thread, arg) {
+  thread_t *thread = (thread_t *)arg;
+  THD_BEGIN();
+  while (1) {
+    UART_SendString(UART1, "print thread\r\n");
+
+    THD_SLEEP_MS(1000);
+  }
+  THD_END();
+}
+
+/* ========================================================= */
+/* ========================== MAIN ========================= */
+/* ========================================================= */
+
 int main(void) {
-  /*!< At this stage the microcontroller clock setting is already configured,
-     this is done through SystemInit() function which is called from startup
-     file (startup_GOWIN_M1.s) before to branch to application main.
-     To reconfigure the default setting of SystemInit() function, refer to
-     system_GOWIN_M1.c file
-   */
-  SystemInit();	//Initializes system clock
-  dbg_init();
-  gpio_init();		//Initializes GPIO0
+  SystemInit();
+  debug_init();
+  gpio_init();
   delay_init();
 
-  UART_SendString(UART1, "Hello from the cortex M1 soft core...\r\n");
+  UART_SendString(UART1, "Cooperative scheduler??\r\n");
 
+  /* Create thread */
+  mkthread(&blinker_thread_wa,
+           sizeof(blinker_thread_wa),
+           0,
+           blinker_thread,
+           NULL);
+  mkthread(&blinker_thread_wa2,
+           sizeof(blinker_thread_wa2),
+           0,
+           blinker_thread2,
+           NULL);
+  mkthread(&print_thread_wa,
+           sizeof(print_thread_wa),
+           0,
+           print_thread,
+           NULL);
 
-	while(1) {
-		// Create an array of the pins you want to toggle
-		const uint32_t pins[] = {
-			GPIO_Pin_0,
-			GPIO_Pin_1/*,
-			GPIO_Pin_2,
-			GPIO_Pin_3,
-			GPIO_Pin_4,
-			GPIO_Pin_5,
-			GPIO_Pin_6*/
-		};
-		const int num_pins = sizeof(pins) / sizeof(pins[0]);
+  /* Scheduler loop */
+  while (1) {
+    for (uint32_t i = 0; i < thread_count; i++) {
+      thread_t *t = &threads[i];
 
-
-		// Loop forward through the pins
-		for (int i = 0; i < num_pins; i++) {
-			GPIO_ResetBit(GPIO0, pins[i]);
-			delay_ms(100);
-			GPIO_SetBit(GPIO0, pins[i]);
-		}
-	}
-}
-
-
-#ifdef  USE_FULL_ASSERT
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t* file, uint32_t line)
-{ 
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-
-  /* Infinite loop */
-  while (1)
-  {
+      if (t->active && system_time_ms >= t->wake_time) {
+        t->func(t);
+      }
+    }
   }
 }
-#endif
-
-/**
-  * @}
-  */

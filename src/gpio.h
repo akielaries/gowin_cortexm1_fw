@@ -25,6 +25,9 @@ typedef struct {
 } Board_Pin_Map_t;
 
 void gpio_init(void);
+
+void GPIO_ToggleBit(GPIO_TypeDef* GPIOx, uint32_t GPIO_Pin);
+
 void Board_Pin_Write(uint8_t board_pin_number, Pin_State_t state);
 void Board_Pin_Toggle(uint8_t board_pin_number);
 

@@ -2,7 +2,6 @@
 #include "GOWIN_M1.h"
 
 
-
 void gpio_init(void) {
   GPIO_InitTypeDef GPIO_InitType;
 
@@ -32,4 +31,13 @@ void gpio_init(void) {
 					 GPIO_Pin_5 |
 					 GPIO_Pin_6);
 */
+}
+
+void GPIO_ToggleBit(GPIO_TypeDef* GPIOx, uint32_t GPIO_Pin) {
+  if (GPIOx->DATAOUT & GPIO_Pin) {
+    GPIOx->DATAOUT &= ~GPIO_Pin;
+  }
+  else {
+    GPIOx->DATAOUT |= GPIO_Pin;
+  }
 }

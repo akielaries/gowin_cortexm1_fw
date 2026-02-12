@@ -81,6 +81,7 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
+	system_time_ms++;
 }
 
 /******************************************************************************/

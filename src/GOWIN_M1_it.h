@@ -21,6 +21,7 @@
 #include "GOWIN_M1.h"
 
 /* Exported types ------------------------------------------------------------*/
+extern volatile uint32_t system_time_ms;
 
 /* Exported constants --------------------------------------------------------*/
 
