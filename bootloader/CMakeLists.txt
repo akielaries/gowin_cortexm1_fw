@@ -1,0 +1,81 @@
+# Set output directories for the bootloader
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/lib)
+
+# Linker script for the bootloader (assuming it uses the same one for now)
+set(LINKER_SCRIPT
+    ${CMAKE_SOURCE_DIR}/bsp/gowin/startup/linker/GOWIN_M1_flash_burn.ld
+)
+
+# Bootloader source files
+file(GLOB_RECURSE BOOTLOADER_SOURCES
+    boot.c
+    ${CMAKE_SOURCE_DIR}/src/debug.c
+    ${CMAKE_SOURCE_DIR}/src/delay.c
+    ${CMAKE_SOURCE_DIR}/src/GOWIN_M1_it.c
+    ${CMAKE_SOURCE_DIR}/src/gpio.c
+    ${CMAKE_SOURCE_DIR}/bsp/gowin/system/*.c
+    ${CMAKE_SOURCE_DIR}/drivers/src/*.c
+    ${CMAKE_SOURCE_DIR}/kernel/*.c
+)
+
+file(GLOB STARTUP_SOURCES
+    ${CMAKE_SOURCE_DIR}/bsp/gowin/startup/*.S
+)
+
+# Define the bootloader executable
+add_executable(bootloader.elf
+    ${STARTUP_SOURCES}
+    ${BOOTLOADER_SOURCES}
+)
+
+# Include directories for the bootloader
+target_include_directories(bootloader.elf PRIVATE
+    ${CMAKE_SOURCE_DIR}/kernel
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/bsp/gowin/core
+    ${CMAKE_SOURCE_DIR}/bsp/gowin/system
+    ${CMAKE_SOURCE_DIR}/drivers/inc
+)
+
+# CPU + Compile options (same as main project)
+target_compile_options(bootloader.elf PRIVATE
+    -mcpu=cortex-m1
+    -mthumb
+
+    -O0
+    -g3
+
+    -fmessage-length=0
+    -fsigned-char
+    -ffunction-sections
+    -fdata-sections
+
+    -std=gnu11
+)
+
+# Linker options (same as main project)
+target_link_options(bootloader.elf PRIVATE
+    -mcpu=cortex-m1
+    -mthumb
+
+    -T ${LINKER_SCRIPT}
+
+    -Wl,--gc-sections
+    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootloader.map
+)
+
+# Post-build: generate .bin
+add_custom_command(TARGET bootloader.elf POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY}
+            -O binary
+            $<TARGET_FILE:bootloader.elf>
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootloader.bin
+)
+
+# Post-build: print size
+add_custom_command(TARGET bootloader.elf POST_BUILD
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/size_summary.sh
+            $<TARGET_FILE:bootloader.elf>
+)

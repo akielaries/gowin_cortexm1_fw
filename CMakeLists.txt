@@ -5,7 +5,6 @@ project(softcore_fw_example C ASM)
 
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_PROCESSOR arm)
-
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)
 set(CMAKE_CXX_COMPILER arm-none-eabi-g++)
 set(CMAKE_ASM_COMPILER arm-none-eabi-gcc)
@@ -41,6 +40,11 @@ file(GLOB STARTUP_SOURCES
 )
 
 # --------------------------------------------------
+# Bootloader subdirectory
+# --------------------------------------------------
+add_subdirectory(bootloader)
+
+# --------------------------------------------------
 # Executable
 # --------------------------------------------------
 add_executable(${PROJECT_NAME}.elf
@@ -58,6 +62,7 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
     drivers/inc
     kernel
 )
+
 
 # --------------------------------------------------
 # CPU + Compile options
@@ -104,7 +109,6 @@ add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
 # Post-build: print size
 # --------------------------------------------------
 add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
-    COMMAND arm-none-eabi-size
-            --format=berkeley
+    COMMAND ${CMAKE_SOURCE_DIR}/scripts/size_summary.sh
             $<TARGET_FILE:${PROJECT_NAME}.elf>
 )
