@@ -41,7 +41,7 @@ static THD_FUNCTION(print_thread, arg) {
   thread_t *thread = (thread_t *)arg;
   THD_BEGIN();
   while (1) {
-    dbg_printf("systime: %ds\r\n", system_time_ms / 1000);
+    dbg_printf("uptime thread: %ds\r\n", system_time_ms / 1000);
     THD_SLEEP_MS(1000);
   }
   THD_END();
@@ -62,7 +62,6 @@ int main(void) {
   dbg_printf("Cooperative scheduler started!\r\n");
 
   /* Create thread */
-  // create the three threads and add them to the scheduler.
   mkthread(&blinker_thread_wa,
            sizeof(blinker_thread_wa),
            0,
@@ -79,6 +78,6 @@ int main(void) {
            print_thread,
            NULL);
 
-  // start the scheduler. this function never returns.
+  // start the scheduler. never returns from here
   kernel_start();
 }
