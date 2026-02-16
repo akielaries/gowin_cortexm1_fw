@@ -37,6 +37,7 @@ target_include_directories(bootloader.elf PRIVATE
     ${CMAKE_SOURCE_DIR}/bsp/gowin/core
     ${CMAKE_SOURCE_DIR}/bsp/gowin/system
     ${CMAKE_SOURCE_DIR}/drivers/inc
+    ${CMAKE_SOURCE_DIR}/cheby
 )
 
 # CPU + Compile options (same as main project)

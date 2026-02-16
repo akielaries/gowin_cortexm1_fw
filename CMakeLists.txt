@@ -61,6 +61,7 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
     bsp/gowin/system
     drivers/inc
     kernel
+    cheby
 )
 
 

@@ -7,11 +7,14 @@
 
 #include "sys_defs.h"
 
+#include "sysinfo_regs.h"
+#include "gpio_regs.h"
+
 #include <stdint.h>
 
 #define MFG_ID_MAX_LEN 9
-
-#define APB_REGS_BASE_SYSINFO 0x60000000
+/*
+#define APB_REGS_BASE_SYSINFO APB_M1 // 0x60000000
 
 #define APB_REGS_SYSINFO_VERSION_MAJOR_SHIFT 0
 #define APB_REGS_SYSINFO_VERSION_MINOR_SHIFT 8
@@ -25,17 +28,21 @@ typedef struct {
 } ahb_regs_sysinfo_t;
 
 volatile ahb_regs_sysinfo_t *sysinfo_regs = (ahb_regs_sysinfo_t *) APB_REGS_BASE_SYSINFO;
+*/
+
+volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *) APB_M1;
+volatile struct gpio_regs *gpio = (struct gpio_regs *) APB_M1 + SYSINFO_REGS_SIZE;
 
 
-void sysinfo_get_mfg(const volatile ahb_regs_sysinfo_t *sysinfo, char *buffer, size_t buffer_size);
+void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size);
 
-void sysinfo_get_mfg(const volatile ahb_regs_sysinfo_t *sysinfo, char *buffer, size_t buffer_size) {
+void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size) {
   if (buffer == NULL || buffer_size < MFG_ID_MAX_LEN || sysinfo == NULL) {
     return;
   }
 
-  uint32_t msb_val = sysinfo->mfg_msb;
-  uint32_t lsb_val = sysinfo->mfg_lsb;
+  uint32_t msb_val = sysinfo->mfg_code_A;
+  uint32_t lsb_val = sysinfo->mfg_code_B;
 
   buffer[0] = (char)((msb_val >> 24) & 0xFF);
   buffer[1] = (char)((msb_val >> 16) & 0xFF);
@@ -63,14 +70,16 @@ int main(void) {
   dbg_printf("mini bootloader....\r\n");
 
   char mfg_id_buffer[MFG_ID_MAX_LEN];
-  sysinfo_get_mfg(sysinfo_regs, mfg_id_buffer, sizeof(mfg_id_buffer));
-  dbg_printf("magic: 0x%X\r\n", sysinfo_regs->magic);
+  sysinfo_get_mfg(sysinfo, mfg_id_buffer, sizeof(mfg_id_buffer));
+  dbg_printf("magic: 0x%X\r\n", sysinfo->magic);
   dbg_printf("mfg_id: %s\r\n", mfg_id_buffer);
-  dbg_printf("version: 0x%08X\r\n", sysinfo_regs->version);
+  dbg_printf("version: 0x%08X\r\n", sysinfo->version);
   dbg_printf("version: v%d.%d.%d\r\n",
-    (sysinfo_regs->version >> APB_REGS_SYSINFO_VERSION_MAJOR_SHIFT) & 0xFF,
-    (sysinfo_regs->version >> APB_REGS_SYSINFO_VERSION_MINOR_SHIFT) & 0xFF,
-    (sysinfo_regs->version >> APB_REGS_SYSINFO_VERSION_PATCH_SHIFT) & 0xFF);
+    (sysinfo->version >> SYSINFO_REGS_VERSION_MAJOR_SHIFT) & 0xFF,
+    (sysinfo->version >> SYSINFO_REGS_VERSION_MINOR_SHIFT) & 0xFF,
+    (sysinfo->version >> SYSINFO_REGS_VERSION_PATCH_SHIFT) & 0xFF);
+
+  dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 
 
 	while(1) {
