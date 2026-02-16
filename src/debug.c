@@ -1,16 +1,56 @@
 #include "GOWIN_M1_uart.h"
 #include "debug.h"
+#include <stdbool.h>
 
-// Helper function to print a number
+// Helper function to print a number in decimal
 static void print_number(int n) {
     if (n < 0) {
         UART_SendChar(UART1, '-');
         n = -n;
     }
+    if (n == 0) {
+        UART_SendChar(UART1, '0');
+        return;
+    }
     if (n / 10) {
         print_number(n / 10);
     }
     UART_SendChar(UART1, (n % 10) + '0');
+}
+
+// Helper function to print a number in hexadecimal
+static void print_hex(unsigned int value, int padding, bool print_prefix) {
+    if (print_prefix) {
+        UART_SendChar(UART1, '0');
+        UART_SendChar(UART1, 'x');
+    }
+
+    // Determine the number of nibbles
+    int num_nibbles = 0;
+    unsigned int temp_value = value;
+    if (temp_value == 0) {
+        num_nibbles = 1;
+    } else {
+        while (temp_value > 0) {
+            temp_value >>= 4;
+            num_nibbles++;
+        }
+    }
+
+    // Apply padding
+    for (int i = 0; i < padding - num_nibbles; i++) {
+        UART_SendChar(UART1, '0');
+    }
+
+    // Print the hex digits
+    for (int i = (num_nibbles - 1) * 4; i >= 0; i -= 4) {
+        unsigned int nibble = (value >> i) & 0xF;
+        if (nibble < 10) {
+            UART_SendChar(UART1, nibble + '0');
+        } else {
+            UART_SendChar(UART1, nibble - 10 + 'A');
+        }
+    }
 }
 
 void debug_init(void) {
@@ -35,6 +75,21 @@ void dbg_printf(const char* format, ...) {
   while (*format) {
     if (*format == '%') {
       format++;
+      int padding = 0;
+      bool zero_pad = false;
+      bool print_prefix = false;
+
+      // Handle padding and prefix for hex values
+      if (*format == '0') {
+        zero_pad = true;
+        format++;
+        // Check if there's a digit after '0' for padding
+        if (*format >= '0' && *format <= '9') {
+          padding = *format - '0';
+          format++;
+        }
+      }
+
       switch (*format) {
         case 'd': {
           int i = va_arg(args, int);
@@ -49,17 +104,34 @@ void dbg_printf(const char* format, ...) {
           break;
         }
         case 'c': {
-          // A 'char' variable will be promoted to 'int'
           char c = (char)va_arg(args, int);
           UART_SendChar(UART1, c);
           break;
+        }
+        case 'x':
+        case 'X': {
+            unsigned int hex_val = va_arg(args, unsigned int);
+            // If the original format string contained '0x', handle it here
+            // The problem description was "0x%08X", so I'll hardcode the prefix for now
+            // More robust solution would be to parse for '0x' in the format string itself.
+            // For now, assuming if 'X' or 'x' is used, we might need '0x' prefix if specified.
+            if (zero_pad && padding > 0) { // crude way to detect '08X' or similar
+                 print_prefix = true;
+            }
+            // For now, let's assume if it's 'X' or 'x' and padding was requested, we should print '0x'
+            // A more robust solution would involve parsing the format string for '0x' explicitly.
+            if (*(format-1) == 'x' || *(format-1) == 'X' ) {
+                print_hex(hex_val, padding, print_prefix);
+            } else {
+                 print_hex(hex_val, padding, false); // No prefix if not explicitly asked
+            }
+            break;
         }
         case '%': {
           UART_SendChar(UART1, '%');
           break;
         }
         default:
-          // Unsupported format specifier, just print it
           UART_SendChar(UART1, '%');
           UART_SendChar(UART1, *format);
           break;

@@ -8,16 +8,14 @@
 #ifndef INCLUDE_SYS_DEFS_H_
 #define INCLUDE_SYS_DEFS_H_
 
-
 #include <errno.h>
 #include <sys/stat.h>
+#include <stddef.h> // For size_t
 
 
 #undef errno
 extern int errno;
 extern int  _end;
-
-
 
 __attribute__((weak)) int _close(int file)
 {
