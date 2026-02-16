@@ -31,7 +31,7 @@ volatile ahb_regs_sysinfo_t *sysinfo_regs = (ahb_regs_sysinfo_t *) APB_REGS_BASE
 */
 
 volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *) APB_M1;
-volatile struct gpio_regs *gpio = (struct gpio_regs *) APB_M1 + SYSINFO_REGS_SIZE;
+volatile struct gpio_regs *gpio = (struct gpio_regs *) (APB_M1 + SYSINFO_REGS_SIZE);
 
 
 void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size);
@@ -67,18 +67,22 @@ int main(void) {
   gpio_init();
   delay_init();
 
-  dbg_printf("mini bootloader....\r\n");
+  dbg_printf("mini 'bootloader'....\r\n");
 
   char mfg_id_buffer[MFG_ID_MAX_LEN];
   sysinfo_get_mfg(sysinfo, mfg_id_buffer, sizeof(mfg_id_buffer));
+
   dbg_printf("magic: 0x%X\r\n", sysinfo->magic);
   dbg_printf("mfg_id: %s\r\n", mfg_id_buffer);
-  dbg_printf("version: 0x%08X\r\n", sysinfo->version);
-  dbg_printf("version: v%d.%d.%d\r\n",
+  dbg_printf("dev version: 0x%08X\r\n", sysinfo->version);
+  dbg_printf("dev version: v%d.%d.%d\r\n",
     (sysinfo->version >> SYSINFO_REGS_VERSION_MAJOR_SHIFT) & 0xFF,
     (sysinfo->version >> SYSINFO_REGS_VERSION_MINOR_SHIFT) & 0xFF,
     (sysinfo->version >> SYSINFO_REGS_VERSION_PATCH_SHIFT) & 0xFF);
-
+  dbg_printf("cheby version: v%d.%d.%d\r\n",
+    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MAJOR_SHIFT) & 0xFF,
+    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
+    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
   dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 
 
