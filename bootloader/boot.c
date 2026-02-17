@@ -12,26 +12,12 @@
 
 #include <stdint.h>
 
+
 #define MFG_ID_MAX_LEN 9
-/*
-#define APB_REGS_BASE_SYSINFO APB_M1 // 0x60000000
 
-#define APB_REGS_SYSINFO_VERSION_MAJOR_SHIFT 0
-#define APB_REGS_SYSINFO_VERSION_MINOR_SHIFT 8
-#define APB_REGS_SYSINFO_VERSION_PATCH_SHIFT 16
-
-typedef struct {
-  uint32_t magic;
-  uint32_t mfg_msb;
-  uint32_t mfg_lsb;
-  uint32_t version;
-} ahb_regs_sysinfo_t;
-
-volatile ahb_regs_sysinfo_t *sysinfo_regs = (ahb_regs_sysinfo_t *) APB_REGS_BASE_SYSINFO;
-*/
 
 volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *) APB_M1;
-volatile struct gpio_regs *gpio = (struct gpio_regs *) (APB_M1 + SYSINFO_REGS_SIZE);
+volatile struct gpio_regs *gpio = (struct gpio_regs *) (APB_M1 + 0x20);
 
 
 void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size);
@@ -53,6 +39,30 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, 
   buffer[6] = (char)((lsb_val >> 8) & 0xFF);
   buffer[7] = (char)((lsb_val >> 0) & 0xFF);
   buffer[8] = '\0';
+}
+
+// print thread for uptime
+static THD_WORKING_AREA(print_thread_wa, 256);
+static THD_FUNCTION(print_thd, arg) {
+  thread_t *thread = (thread_t *)arg;
+  THD_BEGIN();
+  while (1) {
+    dbg_printf("uptime thread: %ds\r\n", system_time_ms / 1000);
+    THD_SLEEP_MS(1000);
+  }
+  THD_END();
+}
+
+// blinky thread
+static THD_WORKING_AREA(blinker_thread_wa, 256);
+static THD_FUNCTION(blinker_thd, arg) {
+  thread_t *thread = (thread_t *)arg; // needed for macros
+  THD_BEGIN();
+  while (1) {
+    GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
+    THD_SLEEP_MS(100); // Fixed time
+  }
+  THD_END();
 }
 
 int main(void) {
@@ -86,19 +96,22 @@ int main(void) {
   dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 
 
-	while(1) {
-    dbg_printf("uptime: %ds\r\n", system_time_ms / 1000);
-		const uint32_t pins[] = {
-			GPIO_Pin_0,
-			GPIO_Pin_1,
-		};
-		const int num_pins = sizeof(pins) / sizeof(pins[0]);
+  /* Create threads */
+  mkthread(&blinker_thread_wa,
+           sizeof(blinker_thread_wa),
+           0,
+           blinker_thd,
+           NULL);
+  mkthread(&print_thread_wa,
+           sizeof(print_thread_wa),
+           0,
+           print_thd,
+           NULL);
 
-		for (int i = 0; i < num_pins; i++) {
-			GPIO_ResetBit(GPIO0, pins[i]);
-			delay_ms(1000);
-			GPIO_SetBit(GPIO0, pins[i]);
-		}
-	}
+
+  // start the scheduler!
+  kernel_start();
+
+  return 0;
 }
 
