@@ -112,6 +112,9 @@ extern volatile uint32_t system_time_ms;
  */
 thread_t *mkthread(thread_t *wa, size_t size, int prio, void (*func)(void *), void *arg);
 
+void thread_kill(thread_t *t);
+
+
 /**
  * @brief starts the kernel's scheduler.
  *

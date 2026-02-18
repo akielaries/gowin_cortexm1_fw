@@ -1,34 +1,31 @@
 #include <stdint.h>
 #include "kernel.h"
 
-/* =================================================================================================
- *
- * this file implements the core functionality of the cooperative kernel.
- * it includes the thread creation function and the main scheduler loop.
- *
- * =================================================================================================
- */
 
-// an array to hold pointers to all the threads managed by the scheduler.
+// an array to hold pointers to all the threads managed by the scheduler
 static thread_t* threads[MAX_THREADS];
-// a counter to keep track of the number of threads that have been created.
+// a counter to keep track of the number of threads that have been created
 static uint32_t thread_count = 0;
-
-// definition of the global system time variable. it is declared as `extern` in `kernel.h`.
+// this is defined in a header somewhere and incremented in the systick intrpt handler
 volatile uint32_t system_time_ms = 0;
 
-/**
- * @brief initializes a new thread and adds it to the scheduler's list.
- *
- * this function sets up the initial state of a `thread_t` structure and adds it to the `threads`
- * array. the thread is then ready to be run by the scheduler.
- *
- * @note the `size` and `prio` parameters are not currently used in this simple implementation,
- * but are included for future compatibility with more advanced schedulers.
- */
 thread_t* mkthread(thread_t* wa, size_t size, int prio, void (*func)(void*), void* arg) {
   (void)size; // parameter is not used
   (void)prio; // parameter is not used
+
+  // look for a free slot first
+  for (uint32_t i = 0; i < thread_count; i++) {
+    if (!threads[i]->active) {
+      wa->func      = func;
+      wa->arg       = wa;
+      wa->wake_time = 0;
+      wa->lc        = 0;
+      wa->active    = 1;
+
+      threads[i] = wa;
+      return wa;
+    }
+  }
 
   // check if we have reached the maximum number of threads
   if (thread_count >= MAX_THREADS) {
@@ -48,15 +45,19 @@ thread_t* mkthread(thread_t* wa, size_t size, int prio, void (*func)(void*), voi
   return wa;
 }
 
+void thread_kill(thread_t *t) {
+  if (t != NULL) {
+    t->active = 0;
+  }
+}
 
 /**
- * @brief starts the main scheduler loop.
- *
  * this function continuously iterates through the list of threads in a round-robin fashion.
  * for each thread, it checks if it is active and if its `wake_time` has been reached. if both
  * conditions are met, it calls the thread's function.
  *
- * @note this function never returns. it is the heart of the kernel's execution.
+ * @note this function never returns. to make err handling better maybe it should... maybe
+ * it goes to some system handler...
  */
 void kernel_start(void) {
   /* Scheduler loop */
