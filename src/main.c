@@ -91,13 +91,13 @@ static THD_FUNCTION(worker_thread, arg) {
 
   uint32_t id = prng_next() & 0xFFFF;
 
-  dbg_printf("WORKER %lu: started\r\n", id);
+  dbg_printf("WORKER %d: started\r\n", id);
 
   // simulate variable workload
   uint32_t work_time = (prng_next() % 2000) + 500;  // 500–2500 ms
   THD_SLEEP_MS(work_time);
 
-  dbg_printf("WORKER %lu: finished after %lums\r\n", id, work_time);
+  dbg_printf("WORKER %d: finished after %dms\r\n", id, work_time);
 
   thread_kill(thread);
   return;
@@ -107,14 +107,13 @@ static THD_FUNCTION(worker_thread, arg) {
 
 // supervisor thread that will spawn the temp thread
 static THD_WORKING_AREA(supervisor_wa, 256);
-
 static THD_FUNCTION(supervisor_thread, arg) {
   thread_t *thread = (thread_t*)arg;
   THD_BEGIN();
   while (1) {
     uint32_t interval = (prng_next() % 5000) + 1000; // 1–6 sec
 
-    dbg_printf("SUPERVISOR: next spawn in %lums\r\n", interval);
+    dbg_printf("SUPERVISOR: next spawn in %dms\r\n", interval);
 
     THD_SLEEP_MS(interval);
 
