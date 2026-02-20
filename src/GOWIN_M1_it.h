@@ -19,6 +19,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "GOWIN_M1.h"
+#include "kernel.h"
+
 
 /* Exported types ------------------------------------------------------------*/
 extern volatile uint32_t system_time_ms;

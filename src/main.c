@@ -16,12 +16,13 @@
 
 
 // dummy generator
+/*
 static uint32_t prng_state = 0x12345678;
 static uint32_t prng_next(void) {
   prng_state = prng_state * 1664525 + 1013904223;
   return prng_state;
 }
-
+*/
 // HW access
 volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *) APB_M1;
 volatile struct gpio_regs *gpio = (struct gpio_regs *) (APB_M1 + 0x20);
@@ -46,87 +47,38 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, 
 }
 
 
-// this thread blinks an led at a fixed rate of 500ms
-static THD_WORKING_AREA(blinker_thread_wa, 256);
-static THD_FUNCTION(blinker_thread, arg) {
-  thread_t *thread = (thread_t *)arg; // needed for macros?
-  THD_BEGIN();
+#define STACK_SIZE 512
+
+/* thread objects */
+static thread_t blink1_thread;
+static thread_t blink2_thread;
+static thread_t print_thread_obj;
+static thread_t worker_thread_obj;
+
+/* stacks */
+static uint8_t blink1_stack[STACK_SIZE];
+static uint8_t blink2_stack[STACK_SIZE];
+static uint8_t print_stack[STACK_SIZE];
+static uint8_t worker_stack[STACK_SIZE];
+
+void blink1(void)
+{
   while (1) {
+    dbg_printf("pin0\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
-    THD_SLEEP_MS(500);
+    thread_sleep_ms(500);
   }
-  THD_END();
 }
 
-// this thread blinks another led at a fixed rate of 100ms
-static THD_WORKING_AREA(blinker_thread_wa2, 256);
-static THD_FUNCTION(blinker_thread2, arg) {
-  thread_t *thread = (thread_t *)arg;
-  THD_BEGIN();
+void blink2(void)
+{
   while (1) {
+    dbg_printf("pin1\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
-    THD_SLEEP_MS(100);
+    thread_sleep_ms(100);
   }
-  THD_END();
 }
 
-// print the uptime to the debug port at 1hz. system_time_ms gets
-// incremented in the systick handler
-static THD_WORKING_AREA(print_thread_wa, 256);
-static THD_FUNCTION(print_thread, arg) {
-  thread_t *thread = (thread_t *)arg;
-  THD_BEGIN();
-  while (1) {
-    dbg_printf("uptime thread: %ds\r\n", system_time_ms / 1000);
-    THD_SLEEP_MS(1000);
-  }
-  THD_END();
-}
-
-// worker thread that will delete itself
-static THD_WORKING_AREA(worker_thread_wa, 256);
-static THD_FUNCTION(worker_thread, arg) {
-  thread_t *thread = (thread_t*)arg;
-  THD_BEGIN();
-
-  uint32_t id = prng_next() & 0xFFFF;
-
-  dbg_printf("WORKER %d: started\r\n", id);
-
-  // simulate variable workload
-  uint32_t work_time = (prng_next() % 2000) + 500;  // 500–2500 ms
-  THD_SLEEP_MS(work_time);
-
-  dbg_printf("WORKER %d: finished after %dms\r\n", id, work_time);
-
-  thread_kill(thread);
-  return;
-
-  THD_END();
-}
-
-// supervisor thread that will spawn the temp thread
-static THD_WORKING_AREA(supervisor_wa, 256);
-static THD_FUNCTION(supervisor_thread, arg) {
-  thread_t *thread = (thread_t*)arg;
-  THD_BEGIN();
-  while (1) {
-    uint32_t interval = (prng_next() % 5000) + 1000; // 1–6 sec
-
-    dbg_printf("SUPERVISOR: next spawn in %dms\r\n", interval);
-
-    THD_SLEEP_MS(interval);
-
-    dbg_printf("SUPERVISOR: spawning worker\r\n");
-
-    mkthread(&worker_thread_wa,
-             sizeof(worker_thread_wa),
-             0,
-             worker_thread,
-             NULL);
-  }
-  THD_END();
-}
 
 /* ========================================================= */
 /* ========================== MAIN ========================= */
@@ -158,30 +110,27 @@ int main(void) {
     (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
   dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 
+
+  // start the scheduler/kernel
+  dbg_printf("stackful kernel starting...\r\n");
+  kernel_init();
+
   dbg_printf("creating threads...\r\n");
+  thread_create(&blink1_thread,
+                blink1,
+                blink1_stack,
+                STACK_SIZE);
 
-  /* Create thread */
-  mkthread(&blinker_thread_wa,
-           sizeof(blinker_thread_wa),
-           0,
-           blinker_thread,
-           NULL);
-  mkthread(&blinker_thread_wa2,
-           sizeof(blinker_thread_wa2),
-           0,
-           blinker_thread2,
-           NULL);
-  mkthread(&print_thread_wa,
-           sizeof(print_thread_wa),
-           0,
-           print_thread,
-           NULL);
-  mkthread(&supervisor_wa,
-         sizeof(supervisor_wa),
-         0,
-         supervisor_thread,
-         NULL);
-
-  // start the scheduler. never returns from here
+  thread_create(&blink2_thread,
+                blink2,
+                blink2_stack,
+                STACK_SIZE);
+  dbg_printf("starting kernel...\r\n");
   kernel_start();
+
+  dbg_printf("main loop...\r\n");
+  while (1) {
+
+  }
+  return 0;
 }

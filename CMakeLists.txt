@@ -33,6 +33,7 @@ file(GLOB_RECURSE SOURCES
     bsp/gowin/system/*.c
     drivers/src/*.c
     kernel/*.c
+    kernel/pendsv.S
 )
 
 file(GLOB STARTUP_SOURCES
@@ -42,7 +43,7 @@ file(GLOB STARTUP_SOURCES
 # --------------------------------------------------
 # Bootloader subdirectory
 # --------------------------------------------------
-add_subdirectory(bootloader)
+#add_subdirectory(bootloader)
 
 # --------------------------------------------------
 # Executable
@@ -79,6 +80,11 @@ target_compile_options(${PROJECT_NAME}.elf PRIVATE
     -fsigned-char
     -ffunction-sections
     -fdata-sections
+
+    -ffixed-r8
+    -ffixed-r9
+    -ffixed-r10
+    -ffixed-r11
 
     -std=gnu11
 )

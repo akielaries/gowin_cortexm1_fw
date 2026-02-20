@@ -1,76 +1,127 @@
-#include <stdint.h>
+#include "GOWIN_M1.h"
 #include "kernel.h"
 
+#include "debug.h"
 
-// an array to hold pointers to all the threads managed by the scheduler
-static thread_t* threads[MAX_THREADS];
-// a counter to keep track of the number of threads that have been created
+
+static thread_t *threads[MAX_THREADS];
 static uint32_t thread_count = 0;
-// this is defined in a header somewhere and incremented in the systick intrpt handler
+
+/*
+ * these are needed by the PendSV handler, so they can't be static
+ */
+thread_t *current_thread = 0;
+
 volatile uint32_t system_time_ms = 0;
 
-thread_t* mkthread(thread_t* wa, size_t size, int prio, void (*func)(void*), void* arg) {
-  (void)size; // parameter is not used
-  (void)prio; // parameter is not used
+/* -------------------------------------------------- */
+/* internal helpers */
+/* -------------------------------------------------- */
 
-  // look for a free slot first
-  for (uint32_t i = 0; i < thread_count; i++) {
-    if (!threads[i]->active) {
-      wa->func      = func;
-      wa->arg       = wa;
-      wa->wake_time = 0;
-      wa->lc        = 0;
-      wa->active    = 1;
+static void init_stack(thread_t *t, void (*entry)(void)) {
+  uint32_t *sp = (uint32_t *)(t->stack_mem + t->stack_size);
+  sp           = (uint32_t *)((uintptr_t)sp & ~7); // 8-byte align
 
-      threads[i] = wa;
-      return wa;
-    }
-  }
+  // decending stack duh
+  // Hardware-stacked registers (pushed by CPU automatically on exception return)
+  // this is in the cortex M1 4.5 pre-emption section too
+  *(--sp) = 0x01000000;      // xPSR
+  *(--sp) = (uint32_t)entry; // PC
+  *(--sp) = 0xFFFFFFFD;      // LR (EXC_RETURN)
+  *(--sp) = 0;               // R12
+  *(--sp) = 0;               // R3
+  *(--sp) = 0;               // R2
+  *(--sp) = 0;               // R1
+  *(--sp) = 0;               // R0
 
-  // check if we have reached the maximum number of threads
-  if (thread_count >= MAX_THREADS) {
+  t->sp = sp;
+}
+
+/* -------------------------------------------------- */
+
+void kernel_init(void) { thread_count = 0; }
+
+/* -------------------------------------------------- */
+
+thread_t *thread_create(thread_t *t, void (*func)(void), uint8_t *stack, size_t stack_size) {
+  if (thread_count >= MAX_THREADS)
     return NULL;
-  }
 
-  // initialize the thread structure
-  wa->func      = func; // set the thread function
-  wa->arg       = wa;   // pass the thread structure itself as an argument
-  wa->wake_time = 0;    // initialize wake time to 0 so it runs immediately
-  wa->lc        = 0;    // initialize line counter to 0 to start at the beginning
-  wa->active    = 1;    // mark the thread as active
+  t->stack_mem  = stack;
+  t->stack_size = stack_size;
+  t->wake_time  = 0;
+  t->state      = THREAD_READY;
 
-  // add the new thread to the list of threads
-  threads[thread_count++] = wa;
+  init_stack(t, func);
 
-  return wa;
+  threads[thread_count++] = t;
+  return t;
 }
 
-void thread_kill(thread_t *t) {
-  if (t != NULL) {
-    t->active = 0;
-  }
-}
+/* -------------------------------------------------- */
 
-/**
- * this function continuously iterates through the list of threads in a round-robin fashion.
- * for each thread, it checks if it is active and if its `wake_time` has been reached. if both
- * conditions are met, it calls the thread's function.
- *
- * @note this function never returns. to make err handling better maybe it should... maybe
- * it goes to some system handler...
- */
-void kernel_start(void) {
-  /* Scheduler loop */
-  while (1) {
-    // iterate over all created threads
-    for (uint32_t i = 0; i < thread_count; i++) {
-      thread_t* t = threads[i];
+thread_t *scheduler_next(void) {
+  dbg_printf("next thread??\r\n");
 
-      // check if the thread is active and if it's time for it to run
-      if (t->active && system_time_ms >= t->wake_time) {
-        // call the thread function, passing the thread structure as an argument
-        t->func(t);
-      }
+  static uint32_t index = 0;
+
+  thread_t *next = current_thread;
+
+  dbg_printf("thd cnt: %d\r\n", thread_count);
+
+  for (uint32_t i = 0; i < thread_count; i++) {
+    index       = (index + 1) % thread_count;
+    dbg_printf("index: %d\r\n", index);
+
+    thread_t *t = threads[index];
+
+    if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
+      t->state = THREAD_READY;
+    }
+
+    if (t->state == THREAD_READY) {
+      return t;
     }
   }
+  dbg_printf("fallback\r\n");
+  return next; // fallback
 }
+
+/* -------------------------------------------------- */
+
+void thread_yield(void) {
+  dbg_printf("enter yld\r\n");
+  SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+  dbg_printf("exit yld\r\n");
+}
+
+/* -------------------------------------------------- */
+
+void thread_sleep_ms(uint32_t ms) {
+  current_thread->wake_time = system_time_ms + ms;
+  current_thread->state     = THREAD_SLEEPING;
+  thread_yield();
+}
+
+/* -------------------------------------------------- */
+void kernel_start(void) {
+    if (thread_count == 0) return;
+
+    current_thread = threads[0];
+
+    __asm volatile(
+        "ldr r0, =current_thread  \n" // r0 = &current_thread
+        "ldr r1, [r0]             \n" // r1 = current_thread
+        "ldr r0, [r1]             \n" // r0 = current_thread->sp
+        "msr psp, r0              \n" // PSP = first thread SP
+        "movs r0, #2              \n"
+        "msr CONTROL, r0          \n" // Switch to PSP, Thread mode
+        "isb                      \n"
+        "ldr r0, =0xFFFFFFFD      \n" // use r0, not lr
+        "mov lr, r0               \n"
+        "bx lr                    \n"
+    );
+    /* Now trigger PendSV to do the first proper context load */
+    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+}
+

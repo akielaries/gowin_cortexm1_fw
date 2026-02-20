@@ -11,6 +11,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "GOWIN_M1_it.h"
+#include "GOWIN_M1.h"
+#include "debug.h"
 
 
 /* Definitions ---------------------------------------------------------------*/
@@ -29,6 +31,9 @@
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+
+extern thread_t *current_thread;
+//extern thread_t *scheduler_next(void);
 
 /******************************************************************************/
 /*            Cortex-M1 Processor Exceptions Handlers                         */
@@ -50,6 +55,14 @@ void NMI_Handler(void)
   */
 void HardFault_Handler(void)
 {
+  /*
+  dbg_printf("\r\nhit hard fault...\r\n");
+    __asm volatile(
+        "mrs r0, msp\n"
+        "mrs r1, psp\n"
+        "bkpt #0\n"   //halt so GDB can catch it cleanly
+    );
+  */
   /* Go to infinite loop when Hard Fault exception occurs */
   while (1)
   {
@@ -63,6 +76,13 @@ void HardFault_Handler(void)
   */
 void SVC_Handler(void)
 {
+    /*
+     * kernel_start initiates the first context switch by calling svc.
+     * this handler just needs to pend the pendsv interrupt to get
+     * the scheduler running.
+     */
+  dbg_printf("SVC_Handler\r\n");
+    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
 /**
@@ -70,10 +90,61 @@ void SVC_Handler(void)
   * @param  none
   * @retval none
   */
-void PendSV_Handler(void)
+/*
+__attribute__((naked)) void PendSV_Handler(void)
 {
+  dbg_printf("sv handler\r\n");
+    __asm volatile(
+        "cpsid i           \n"
+        "mrs r0, psp       \n"      // current PSP
+        "ldr r1, =current_thread \n"
+        "ldr r2, [r1]      \n"
+        "cmp r2, #0        \n"
+        "beq 1f            \n"      // skip save if NULL
+
+        // save r4-r7
+        "sub r0, #16       \n"
+        "stm r0, {r4-r7}   \n"
+
+        // save r8-r11 via r4 temporary
+        "mov r4, r8        \n"
+        "str r4, [r0,#0]   \n"
+        "mov r4, r9        \n"
+        "str r4, [r0,#4]   \n"
+        "mov r4, r10       \n"
+        "str r4, [r0,#8]   \n"
+        "mov r4, r11       \n"
+        "str r4, [r0,#12]  \n"
+
+        // update thread SP
+        "str r0, [r2]      \n"
+        "1:                \n"
+
+        // get next thread
+        "bl scheduler_next \n"
+        "str r0, [r1]      \n"
+        "ldr r0, [r0]      \n"       // PSP of next thread
+
+        // restore r4-r7
+        "ldm r0!, {r4-r7}  \n"
+
+        // restore r8-r11 via r4 temporary
+        "ldr r4, [r0,#0]   \n"
+        "mov r8, r4        \n"
+        "ldr r4, [r0,#4]   \n"
+        "mov r9, r4        \n"
+        "ldr r4, [r0,#8]   \n"
+        "mov r10, r4       \n"
+        "ldr r4, [r0,#12]  \n"
+        "mov r11, r4       \n"
+
+        "msr psp, r0       \n"
+        "cpsie i           \n"
+        "bx lr             \n"
+    );
 }
 
+*/
 /**
   * @brief  This function handles SysTick Handler.
   * @param  none
