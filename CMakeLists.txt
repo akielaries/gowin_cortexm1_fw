@@ -22,7 +22,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # Linker script
 # --------------------------------------------------
 set(LINKER_SCRIPT
-    ${CMAKE_SOURCE_DIR}/bsp/gowin/startup/linker/GOWIN_M1_flash_burn.ld
+    ${CMAKE_SOURCE_DIR}/bsp/startup/linker/GOWIN_M1_flash_burn.ld
 )
 
 # --------------------------------------------------
@@ -30,14 +30,14 @@ set(LINKER_SCRIPT
 # --------------------------------------------------
 file(GLOB_RECURSE SOURCES
     src/*.c
-    bsp/gowin/system/*.c
-    drivers/src/*.c
+    bsp/system/*.c
+    bsp/drivers/src/*.c
     kernel/*.c
     kernel/pendsv.S
 )
 
 file(GLOB STARTUP_SOURCES
-    bsp/gowin/startup/*.S
+    bsp/startup/*.S
 )
 
 # --------------------------------------------------
@@ -58,9 +58,9 @@ add_executable(${PROJECT_NAME}.elf
 # --------------------------------------------------
 target_include_directories(${PROJECT_NAME}.elf PRIVATE
     src
-    bsp/gowin/core
-    bsp/gowin/system
-    drivers/inc
+    bsp/core
+    bsp/system
+    bsp/drivers/inc
     kernel
     cheby
 )
