@@ -47,7 +47,7 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, 
 }
 
 
-#define STACK_SIZE 512
+#define STACK_SIZE 1024
 
 /* thread objects */
 static thread_t blink1_thread;

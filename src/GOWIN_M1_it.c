@@ -55,14 +55,14 @@ void NMI_Handler(void)
   */
 void HardFault_Handler(void)
 {
-  /*
+  
   dbg_printf("\r\nhit hard fault...\r\n");
     __asm volatile(
         "mrs r0, msp\n"
         "mrs r1, psp\n"
-        "bkpt #0\n"   //halt so GDB can catch it cleanly
+        "bkpt #0\n"   /* halt so GDB can catch it cleanly */
     );
-  */
+
   /* Go to infinite loop when Hard Fault exception occurs */
   while (1)
   {
@@ -81,8 +81,8 @@ void SVC_Handler(void)
      * this handler just needs to pend the pendsv interrupt to get
      * the scheduler running.
      */
-  dbg_printf("SVC_Handler\r\n");
-    SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+  //dbg_printf("SVC_Handler\r\n");
+  SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
 }
 
 /**
