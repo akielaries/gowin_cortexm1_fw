@@ -52,6 +52,14 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo,
 }
 
 
+THREAD_STACK(uptime, 512);
+THREAD_FUNCTION(uptime_fn, arg) {
+  while (1) {
+    dbg_printf("uptime: %ds\r\n", system_time_ms / 1000);
+    thread_sleep_ms(1000);
+  }
+}
+
 THREAD_STACK(blink1, 512);
 THREAD_FUNCTION(blink1_fn, arg) {
   while (1) {
@@ -72,15 +80,6 @@ THREAD_FUNCTION(blink2_fn, arg) {
 
 // basic thread that just yields
 
-/*
-static uint8_t idle_stack[256];
-static thread_t idle_thread_obj;
-void idle_task(void) {
-    while(1) {
-        __WFI();  //sleep until next interrupt
-    }
-}
-*/
 
 /* ========================================================= */
 /* ========================== MAIN ========================= */
@@ -119,11 +118,7 @@ int main(void) {
   kernel_init();
 
   dbg_printf("creating threads...\r\n");
-  // thread_create(&idle_thread_obj, idle_task, idle_stack, 256);
-
-  //thread_create(&blink1_thread, blink1, blink1_stack, STACK_SIZE);
-  //thread_create(&blink2_thread, blink2, blink2_stack, STACK_SIZE);
-
+  mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
   mkthd_static(blink1, blink1_fn, sizeof(blink1), PRIO_NORMAL, NULL);
   mkthd_static(blink2, blink2_fn, sizeof(blink2), PRIO_NORMAL, NULL);
 
