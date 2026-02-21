@@ -18,7 +18,6 @@ extern uint32_t __StackLimit;
 extern uint32_t __StackTop;
 
 
-
 // dummy generator
 /*
 static uint32_t prng_state = 0x12345678;
@@ -28,10 +27,12 @@ static uint32_t prng_next(void) {
 }
 */
 // HW access
-volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *) APB_M1;
-volatile struct gpio_regs *gpio = (struct gpio_regs *) (APB_M1 + 0x20);
+volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *)APB_M1;
+volatile struct gpio_regs *gpio       = (struct gpio_regs *)(APB_M1 + 0x20);
 
-void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size) {
+void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo,
+                     char *buffer,
+                     size_t buffer_size) {
   if (buffer == NULL || buffer_size < MFG_ID_MAX_LEN || sysinfo == NULL) {
     return;
   }
@@ -51,20 +52,8 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, 
 }
 
 
-#define STACK_SIZE 1024
-
-
-
-/* thread objects */
-static thread_t blink1_thread;
-static thread_t blink2_thread;
-
-/* stacks */
-static uint8_t blink1_stack[STACK_SIZE];
-static uint8_t blink2_stack[STACK_SIZE];
-
-void blink1(void)
-{
+THREAD_STACK(blink1, 512);
+THREAD_FUNCTION(blink1_fn, arg) {
   while (1) {
     dbg_printf("pin0\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
@@ -72,14 +61,16 @@ void blink1(void)
   }
 }
 
-void blink2(void)
-{
+THREAD_STACK(blink2, 512);
+THREAD_FUNCTION(blink2_fn, arg) {
   while (1) {
     dbg_printf("pin1\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
     thread_sleep_ms(1000);
   }
 }
+
+// basic thread that just yields
 
 /*
 static uint8_t idle_stack[256];
@@ -95,8 +86,7 @@ void idle_task(void) {
 /* ========================== MAIN ========================= */
 /* ========================================================= */
 /*
- * this is the main entry point for the application. it initializes the system and the threads,
- * and then starts the cooperative scheduler.
+ * this is the main entry point for the application. it initializes the system and the threads
  */
 int main(void) {
   // initialize the system, including the debug uart, gpio, and delay timer.
@@ -114,13 +104,13 @@ int main(void) {
   dbg_printf("mfg_id: %s\r\n", mfg_id_buffer);
   dbg_printf("dev version: 0x%08X\r\n", sysinfo->version);
   dbg_printf("dev version: v%d.%d.%d\r\n",
-    (sysinfo->version >> SYSINFO_REGS_VERSION_MAJOR_SHIFT) & 0xFF,
-    (sysinfo->version >> SYSINFO_REGS_VERSION_MINOR_SHIFT) & 0xFF,
-    (sysinfo->version >> SYSINFO_REGS_VERSION_PATCH_SHIFT) & 0xFF);
+             (sysinfo->version >> SYSINFO_REGS_VERSION_MAJOR_SHIFT) & 0xFF,
+             (sysinfo->version >> SYSINFO_REGS_VERSION_MINOR_SHIFT) & 0xFF,
+             (sysinfo->version >> SYSINFO_REGS_VERSION_PATCH_SHIFT) & 0xFF);
   dbg_printf("cheby version: v%d.%d.%d\r\n",
-    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MAJOR_SHIFT) & 0xFF,
-    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
-    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
+             (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MAJOR_SHIFT) & 0xFF,
+             (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
+             (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
   dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 
 
@@ -129,24 +119,18 @@ int main(void) {
   kernel_init();
 
   dbg_printf("creating threads...\r\n");
-  //thread_create(&idle_thread_obj, idle_task, idle_stack, 256);
+  // thread_create(&idle_thread_obj, idle_task, idle_stack, 256);
 
-  thread_create(&blink1_thread,
-                blink1,
-                blink1_stack,
-                STACK_SIZE);
-  thread_create(&blink2_thread,
-                blink2,
-                blink2_stack,
-                STACK_SIZE);
+  //thread_create(&blink1_thread, blink1, blink1_stack, STACK_SIZE);
+  //thread_create(&blink2_thread, blink2, blink2_stack, STACK_SIZE);
+
+  mkthd_static(blink1, blink1_fn, sizeof(blink1), PRIO_NORMAL, NULL);
+  mkthd_static(blink2, blink2_fn, sizeof(blink2), PRIO_NORMAL, NULL);
+
 
   dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);
   dbg_printf("SysTick LOAD: 0x%08X\r\n", SysTick->LOAD);
   dbg_printf("SysTick CTRL: 0x%08X\r\n", SysTick->CTRL);
-
-  dbg_printf("blink1_stack: 0x%08X - 0x%08X\r\n",
-    (uint32_t)blink1_stack,
-    (uint32_t)blink1_stack + STACK_SIZE);
   dbg_printf("__StackLimit: 0x%08X\r\n", (uint32_t)&__StackLimit);
   dbg_printf("__StackTop:   0x%08X\r\n", (uint32_t)&__StackTop);
 
