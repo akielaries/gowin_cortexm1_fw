@@ -19,12 +19,12 @@ volatile uint32_t system_time_ms = 0;
 /* internal helpers */
 /* -------------------------------------------------- */
 
-static void init_stack(thread_t *t, void (*entry)(void)) {
-  uint32_t *sp = (uint32_t *)(t->stack_mem + t->stack_size);
+static void init_stack(thread_t *new_thread, void (*entry)(void)) {
+  uint32_t *sp = (uint32_t *)(new_thread->stack_mem + new_thread->stack_size);
   sp           = (uint32_t *)((uintptr_t)sp & ~7); // 8-byte align
 
   // hw exception frame (CPU unstacks these on EXC_RETURN)
-  *(--sp) = 0x01000000;      // xPSR — Thumb bit set
+  *(--sp) = 0x01000000;      // xPSR with the thumb bit set
   *(--sp) = (uint32_t)entry; // PC
   *(--sp) = 0xFFFFFFFD;      // LR (EXC_RETURN: Thread mode, PSP)
   *(--sp) = 0;               // R12
@@ -44,14 +44,12 @@ static void init_stack(thread_t *t, void (*entry)(void)) {
   *(--sp) = 0; // R10
   *(--sp) = 0; // R9
   *(--sp) = 0; // R8
-  t->sp   = sp;
+  new_thread->sp   = sp;
 }
 
-/* -------------------------------------------------- */
-
-void kernel_init(void) { thread_count = 0; }
-
-/* -------------------------------------------------- */
+void kernel_init(void) {
+  thread_count = 0;
+}
 
 thread_t *thread_create(thread_t *t,
                         void (*func)(void),
@@ -105,11 +103,14 @@ thread_t *scheduler_next(void) {
   }
   return NULL; /* all sleeping */
 }
-/* -------------------------------------------------- */
 
-void thread_yield(void) { SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk; }
-
-/* -------------------------------------------------- */
+void thread_yield(void) {
+  // system control block->interrupt control and state reg
+  // this bit is going to pend the pendSV exception. not directly invoking a
+  // context switch but tells the processor to handle pendSV soon which DOES
+  // handle the context switch (pendsv.S)
+  SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
+}
 
 void thread_sleep_ms(uint32_t ms) {
   // dbg_printf("sleep: current_thread=0x%08X\r\n", (uint32_t)current_thread);
@@ -126,7 +127,6 @@ void thread_sleep_ms(uint32_t ms) {
   thread_yield();
 }
 
-/* -------------------------------------------------- */
 void kernel_start(void) {
   if (thread_count == 0)
     return;
