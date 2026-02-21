@@ -28,7 +28,7 @@
 ;  <o> Stack Size (in Bytes) <0x0-0xFFFFFFFF:8>
 ;</h>
 */
-                .equ     Stack_Size, 0x00001000
+                .equ     Stack_Size, 0x00002000
 
                 .section .stack
                 .align   3

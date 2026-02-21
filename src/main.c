@@ -14,6 +14,10 @@
 
 #define MFG_ID_MAX_LEN 9
 
+extern uint32_t __StackLimit;
+extern uint32_t __StackTop;
+
+
 
 // dummy generator
 /*
@@ -49,17 +53,15 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, 
 
 #define STACK_SIZE 1024
 
+
+
 /* thread objects */
 static thread_t blink1_thread;
 static thread_t blink2_thread;
-static thread_t print_thread_obj;
-static thread_t worker_thread_obj;
 
 /* stacks */
 static uint8_t blink1_stack[STACK_SIZE];
 static uint8_t blink2_stack[STACK_SIZE];
-static uint8_t print_stack[STACK_SIZE];
-static uint8_t worker_stack[STACK_SIZE];
 
 void blink1(void)
 {
@@ -75,10 +77,19 @@ void blink2(void)
   while (1) {
     dbg_printf("pin1\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
-    thread_sleep_ms(100);
+    thread_sleep_ms(1000);
   }
 }
 
+/*
+static uint8_t idle_stack[256];
+static thread_t idle_thread_obj;
+void idle_task(void) {
+    while(1) {
+        __WFI();  //sleep until next interrupt
+    }
+}
+*/
 
 /* ========================================================= */
 /* ========================== MAIN ========================= */
@@ -93,6 +104,8 @@ int main(void) {
   debug_init();
   gpio_init();
   delay_init();
+
+  dbg_printf("SystemCoreClock: %d mHz\r\n", SystemCoreClock / 1000000);
 
   char mfg_id_buffer[MFG_ID_MAX_LEN];
   sysinfo_get_mfg(sysinfo, mfg_id_buffer, sizeof(mfg_id_buffer));
@@ -116,21 +129,33 @@ int main(void) {
   kernel_init();
 
   dbg_printf("creating threads...\r\n");
+  //thread_create(&idle_thread_obj, idle_task, idle_stack, 256);
+
   thread_create(&blink1_thread,
                 blink1,
                 blink1_stack,
                 STACK_SIZE);
-
   thread_create(&blink2_thread,
                 blink2,
                 blink2_stack,
                 STACK_SIZE);
+
+  dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);
+  dbg_printf("SysTick LOAD: 0x%08X\r\n", SysTick->LOAD);
+  dbg_printf("SysTick CTRL: 0x%08X\r\n", SysTick->CTRL);
+
+  dbg_printf("blink1_stack: 0x%08X - 0x%08X\r\n",
+    (uint32_t)blink1_stack,
+    (uint32_t)blink1_stack + STACK_SIZE);
+  dbg_printf("__StackLimit: 0x%08X\r\n", (uint32_t)&__StackLimit);
+  dbg_printf("__StackTop:   0x%08X\r\n", (uint32_t)&__StackTop);
+
   dbg_printf("starting kernel...\r\n");
   kernel_start();
 
   dbg_printf("main loop...\r\n");
   while (1) {
-
+    thread_sleep_ms(100);
   }
   return 0;
 }

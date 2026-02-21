@@ -14,7 +14,7 @@ typedef enum {
 typedef struct thread {
   uint32_t *sp;            // saved stack pointer
 
-  uint32_t wake_time;
+  volatile uint32_t wake_time;
   thread_state_t state;
 
   uint8_t *stack_mem;
@@ -27,7 +27,7 @@ extern volatile uint32_t system_time_ms;
 /*
  * these are needed by the PendSV handler, so they can't be static
  */
-extern thread_t *current_thread;
+extern thread_t *volatile current_thread;
 thread_t *scheduler_next(void);
 
 /* kernel lifecycle */

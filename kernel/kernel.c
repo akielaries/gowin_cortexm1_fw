@@ -10,7 +10,8 @@ static uint32_t thread_count = 0;
 /*
  * these are needed by the PendSV handler, so they can't be static
  */
-thread_t *current_thread = 0;
+thread_t *volatile current_thread = 0;
+
 
 volatile uint32_t system_time_ms = 0;
 
@@ -48,7 +49,9 @@ static void init_stack(thread_t *t, void (*entry)(void)) {
 
 /* -------------------------------------------------- */
 
-void kernel_init(void) { thread_count = 0; }
+void kernel_init(void) {
+  thread_count = 0;
+}
 
 /* -------------------------------------------------- */
 
@@ -70,24 +73,32 @@ thread_t *thread_create(thread_t *t, void (*func)(void), uint8_t *stack, size_t 
 /* -------------------------------------------------- */
 
 thread_t *scheduler_next(void) {
-  static uint32_t index = 0;
-  thread_t *next = current_thread;
+    static uint32_t index = 0;
+    static uint8_t initialized = 0;
 
-  for (uint32_t i = 0; i < thread_count; i++) {
-    index       = (index + 1) % thread_count;
-    thread_t *t = threads[index];
-
-    if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
-      t->state = THREAD_READY;
+    if (!initialized) {
+        initialized = 1;
+        index = thread_count - 1;  /* first increment -> index 0 */
     }
 
-    if (t->state == THREAD_READY) {
-      return t;
+    for (uint32_t i = 0; i < thread_count; i++) {
+        index = (index + 1) % thread_count;
+        thread_t *t = threads[index];
+
+        if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
+          dbg_printf("waking thread, systime=%d wake_time=%d\r\n",
+               system_time_ms, t->wake_time);
+
+            t->state = THREAD_READY;
+        }
+
+        if (t->state == THREAD_READY) {
+            return t;
+        }
     }
-  }
-  return next; // fallback
+    return NULL;  /* all sleeping */
+
 }
-
 /* -------------------------------------------------- */
 
 void thread_yield(void) {
@@ -97,8 +108,15 @@ void thread_yield(void) {
 /* -------------------------------------------------- */
 
 void thread_sleep_ms(uint32_t ms) {
+  dbg_printf("sleep: current_thread=0x%08X\r\n", (uint32_t)current_thread);
+  if (current_thread == NULL) {
+    dbg_printf("ERROR: current_thread is NULL!\r\n");
+    while(1) {}
+  }
+
   current_thread->wake_time = system_time_ms + ms;
   current_thread->state     = THREAD_SLEEPING;
+  dbg_printf("systime: %d waketime: %d\r\n", system_time_ms, current_thread->wake_time);
   thread_yield();
 }
 
@@ -106,7 +124,8 @@ void thread_sleep_ms(uint32_t ms) {
 void kernel_start(void) {
     if (thread_count == 0) return;
 
-    NVIC_SetPriority(PendSV_IRQn, 0xFF);
+    NVIC_SetPriority(PendSV_IRQn, 0xFF);   // lowest
+    NVIC_SetPriority(SysTick_IRQn, 0x00);  // highest
 
     uint32_t first_sp = (uint32_t)threads[0]->sp;
 

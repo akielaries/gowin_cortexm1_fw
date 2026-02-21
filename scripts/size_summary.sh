@@ -7,8 +7,8 @@ SIZE_PREV="${FILE}.size.prev"
 # GOWIN M1 memory layout from linker script
 # FLASH (rx)  : ORIGIN = 0x00000000, LENGTH = 16k
 # RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 16k
-TOTAL_FLASH_BYTES=16384
-TOTAL_RAM_BYTES=16384
+TOTAL_FLASH_BYTES=64000
+TOTAL_RAM_BYTES=64000
 
 arm-none-eabi-size "$FILE" > "$SIZE_FILE"
 
