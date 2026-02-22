@@ -60,6 +60,7 @@ THREAD_FUNCTION(fast_fn, arg) {
   while (1) {
     GPIO_ToggleBit(GPIO0, GPIO_Pin_2);
     //thread_sleep_ms(2);
+    thread_yield();
   }
 }
 
@@ -69,7 +70,7 @@ THREAD_FUNCTION(fast_fn, arg) {
 THREAD_STACK(compute_thd, 512);
 THREAD_FUNCTION(compute_fn, arg) {
   while (1) {
-    uint32_t iters = 500000 + (lcg_rand() % 2000000);
+    uint32_t iters = 500000 + (lcg_rand() % 5000000);
     uint32_t result = 0;
 
     uint32_t t_start = system_time_ms;

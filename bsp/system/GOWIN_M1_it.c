@@ -87,12 +87,19 @@ void SVC_Handler(void) {
 void SysTick_Handler(void) {
   system_time_ms++;
 
-  // the kernel might not be running! this is only initially though on boot i think?
+  // the kernel might not be running! this is only initially though on boot i
+  // think?
   if (kernel_running) {
     // send us to pendSV to service anything that's "pending"?
+    // This fires every 1ms at highest priority, preempting whatever thread is
+    // running. It increments time and pends PendSV. Since PendSV is lowest
+    // priority it won't actually run until SysTick returns, but that's fine —
+    // the pending bit stays set. This is what makes the scheduler preemptive
+    // rather than cooperative. A thread can't hold the CPU longer than 1ms
+    // regardless of whether it yields.
+
     SCB->ICSR |= SCB_ICSR_PENDSVSET_Msk;
   }
-
 }
 
 /******************************************************************************/
