@@ -9,6 +9,13 @@
 
 
 /*
+ * Every context switch goes through here. There are two cases:
+ *
+ **Case 1: First ever switch (current_thread == NULL)**
+ **Case 2: Normal switch (current_thread != NULL)**
+ *
+ *
+ *
  * the manual states:
  * > Registers R8-R12 are not accessible by all 16-bit instructions
  *
@@ -57,6 +64,7 @@ PendSV_Handler:
   // r3 = current_thread  (the thread_t* itself)
   ldr     r3, [r2]
   // make sure it's not NULL?
+  // r3 - 0 
   cmp     r3, #0
   // first context switch, no thread to save
   beq     skip_save

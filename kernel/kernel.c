@@ -4,13 +4,13 @@
 #include "debug.h"
 
 
-//these are needed by the PendSV handler, so they can't be static
+// these are needed by the PendSV handler, so they can't be static
 static thread_t *threads[MAX_THREADS];
-static uint32_t thread_count = 0;
+static uint32_t thread_count      = 0;
 thread_t *volatile current_thread = 0;
 
 volatile uint32_t system_time_ms = 0;
-volatile uint8_t kernel_running = 0;
+volatile uint8_t kernel_running  = 0;
 
 extern uint32_t __StackLimit;
 extern uint32_t __StackTop;
@@ -20,6 +20,11 @@ extern uint32_t __StackTop;
 /* internal helpers */
 /* -------------------------------------------------- */
 
+/**
+ * this creates a fake exception frame on the thread's stack so that when
+ * PendSV restores it for the first time the core thinks it's returning from
+ * an exception that was already in progress...
+ */
 static void init_stack(thread_t *new_thread, void (*entry)(void)) {
   uint32_t *sp = (uint32_t *)(new_thread->stack_mem + new_thread->stack_size);
   sp           = (uint32_t *)((uintptr_t)sp & ~7); // 8-byte align
@@ -41,11 +46,14 @@ static void init_stack(thread_t *new_thread, void (*entry)(void)) {
   *(--sp) = 0; // R5
   *(--sp) = 0; // R4
 
-  *(--sp) = 0; // R11
-  *(--sp) = 0; // R10
-  *(--sp) = 0; // R9
-  *(--sp) = 0; // R8
-  new_thread->sp   = sp;
+  *(--sp)        = 0; // R11
+  *(--sp)        = 0; // R10
+  *(--sp)        = 0; // R9
+  *(--sp)        = 0; // R8
+  // here is the bottom of this stack frame. we point to R8
+  // the thread has never run but looks to the CPU exactly like a thread that
+  // was interrupted mid execution
+  new_thread->sp = sp;
 }
 
 void kernel_init(void) {
@@ -83,25 +91,53 @@ thread_t *thread_create(thread_t *t,
 /* -------------------------------------------------- */
 
 thread_t *scheduler_next(void) {
-    // wake any sleeping threads whose time has come
-    for (uint32_t i = 0; i < thread_count; i++) {
-        thread_t *t = threads[i];
-        if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
-            t->state = THREAD_READY;
-        }
-    }
+  // last thread that was serviced?
+  static uint32_t last_thd_idx = 0;
 
-    // find highest priority ready thread
-    thread_t *best = NULL;
-    for (uint32_t i = 0; i < thread_count; i++) {
-        thread_t *t = threads[i];
-        if (t->state == THREAD_READY) {
-            if (best == NULL || t->priority > best->priority) {
-                best = t;
-            }
-        }
+  // wake any sleeping threads whose time has come
+  for (uint32_t i = 0; i < thread_count; i++) {
+    thread_t *t = threads[i];
+    if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
+      t->state = THREAD_READY;
     }
-    return best;
+  }
+
+  /*
+  // find highest priority ready thread
+  thread_t *best = NULL;
+  for (uint32_t i = 0; i < thread_count; i++) {
+    thread_t *t = threads[i];
+    if (t->state == THREAD_READY) {
+      if (best == NULL || t->priority > best->priority) {
+        best = t;
+      }
+    }
+  }
+  return best;
+  */
+
+  // find highest prio out of all the ready threads
+  uint8_t highest_prio = 0;
+  for (uint32_t i = 0; i < thread_count; i++) {
+    if (threads[i]->state == THREAD_READY && threads[i]->priority > highest_prio) {
+      // set the highest priority found... i guess if there's multiple of the highest
+      // prio then we use the first found?... or "round robin" all threads found at
+      // that same priority?
+      highest_prio = threads[i]->priority;
+    }
+  }
+
+  for (uint32_t i = 1; i <= thread_count; i++) {
+    uint32_t current_thd_idx = (last_thd_idx + i) % thread_count;
+    thread_t *t = threads[current_thd_idx];
+
+    if (t->state == THREAD_READY && t->priority == highest_prio) {
+      last_thd_idx = current_thd_idx;
+      return t;
+    }
+  }
+
+  return NULL;
 }
 void thread_yield(void) {
   // system control block->interrupt control and state reg
@@ -137,6 +173,10 @@ void kernel_start(void) {
 
   kernel_running = 1;
 
+  // svc #0 fires SVC_Handler which just pends PendSV. PendSV then runs the
+  // scheduler for the first time with `current_thread == NULL`
+  // SVC_Handler will set the PENDSVSET mask in the Interrupt Control and
+  // State register
   __asm volatile("msr psp, %0             \n" // PSP = first thread stack
                  "ldr r0, =current_thread \n"
                  "movs r1, #0             \n"
