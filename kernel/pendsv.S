@@ -9,27 +9,30 @@
 
 
 /*
+ * the manual states:
+ * > Registers R8-R12 are not accessible by all 16-bit instructions
+ *
  * PSP stack layout after exception entry:
  *
  *  (high addr)
  *  +-----------+
- *  |   xPSR    |  status flags (Thumb bit, condition codes)
- *  |    PC     |  address of next instruction in interrupted thread
- *  |    LR     |  return address of interrupted function
- *  |   R12     |  scratch register (caller-saved)
+ *  |   xPSR    |  status flags (Thumb bit 0x01000000)
+ *  |    PC     |  program counter: address of next instruction in interrupted thread
+ *  |    LR     |  link reg: return address of interrupted function
+ *  |   R12     |  scratch register (caller-saved?)
  *  |    R3     |  \
  *  |    R2     |  |  argument / scratch registers
- *  |    R1     |  |  (caller-saved, may hold anything)
+ *  |    R1     |  |  (caller-saved, may hold anything?)
  *  |    R0     |  /
  *  +-----------+  <-- PSP on exception entry (CPU did this automatically)
  *  |    R7     |  \
  *  |    R6     |  |
- *  |    R5     |  |  callee-saved registers -- thread is responsible for
+ *  |    R5     |  |  callee-saved registers.....thread is responsible for
  *  |    R4     |  |  preserving these across function calls, so we must
  *  |   R11     |  |  save/restore them manually across context switches
  *  |   R10     |  |
  *  |    R9     |  |
- *  |    R8     |  /
+ *  |    R8     |
  *  +-----------+  <-- thread->sp (saved here, restored on next switch in)
  *  (low addr)
  */
@@ -37,6 +40,7 @@
 
 PendSV_Handler:
   // critical section so we disable interrupts here
+  // i think this means systick doesn't fire? is that bad?
   cpsid   i
   // save R4 to later overwrite/clobber and the link register is going to contain the
   // EXC_RETURN value we need to return from exception
@@ -52,6 +56,7 @@ PendSV_Handler:
   ldr     r2, =current_thread
   // r3 = current_thread  (the thread_t* itself)
   ldr     r3, [r2]
+  // make sure it's not NULL?
   cmp     r3, #0
   // first context switch, no thread to save
   beq     skip_save

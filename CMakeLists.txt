@@ -43,7 +43,7 @@ file(GLOB STARTUP_SOURCES
 # --------------------------------------------------
 # Bootloader subdirectory
 # --------------------------------------------------
-#add_subdirectory(bootloader)
+add_subdirectory(bootloader)
 
 # --------------------------------------------------
 # Executable

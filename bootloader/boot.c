@@ -1,10 +1,9 @@
 #include "GOWIN_M1.h"
 
 #include "kernel.h"
+#include "debug.h"
 #include "gpio.h"
 #include "delay.h"
-#include "debug.h"
-
 #include "sys_defs.h"
 
 #include "sysinfo_regs.h"
@@ -15,14 +14,25 @@
 
 #define MFG_ID_MAX_LEN 9
 
+extern uint32_t __StackLimit;
+extern uint32_t __StackTop;
 
-volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *) APB_M1;
-volatile struct gpio_regs *gpio = (struct gpio_regs *) (APB_M1 + 0x20);
 
+// dummy generator
+static uint32_t lcg_state = 12345;
 
-void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size);
+static uint32_t lcg_rand(void) {
+  lcg_state = lcg_state * 1664525 + 1013904223;
+  return lcg_state;
+}
 
-void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, size_t buffer_size) {
+// HW access
+volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *)APB_M1;
+volatile struct gpio_regs *gpio       = (struct gpio_regs *)(APB_M1 + 0x20);
+
+void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo,
+                     char *buffer,
+                     size_t buffer_size) {
   if (buffer == NULL || buffer_size < MFG_ID_MAX_LEN || sysinfo == NULL) {
     return;
   }
@@ -41,43 +51,55 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo, char *buffer, 
   buffer[8] = '\0';
 }
 
-// print thread for uptime
-static THD_WORKING_AREA(print_thread_wa, 256);
-static THD_FUNCTION(print_thd, arg) {
-  thread_t *thread = (thread_t *)arg;
-  THD_BEGIN();
+
+/* ========================================================= */
+
+// IDLE THREAD! this should ideally just be main() i think but idk
+THREAD_STACK(idle, 256);
+THREAD_FUNCTION(idle_fn, arg) {
   while (1) {
-    dbg_printf("uptime thread: %ds\r\n", system_time_ms / 1000);
-    THD_SLEEP_MS(1000);
+    __WFI();
   }
-  THD_END();
 }
 
-// blinky thread
-static THD_WORKING_AREA(blinker_thread_wa, 256);
-static THD_FUNCTION(blinker_thd, arg) {
-  thread_t *thread = (thread_t *)arg; // needed for macros
-  THD_BEGIN();
+THREAD_STACK(uptime, 512);
+THREAD_FUNCTION(uptime_fn, arg) {
+  while (1) {
+    dbg_printf("uptime: %ds\r\n", system_time_ms / 1000);
+    thread_sleep_ms(1000);
+  }
+}
+
+THREAD_STACK(blink1_thd, 512);
+THREAD_FUNCTION(blink1_fn, arg) {
+  while (1) {
+    GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
+    thread_sleep_ms(500);
+  }
+}
+
+THREAD_STACK(blink2_thd, 512);
+THREAD_FUNCTION(blink2_fn, arg) {
   while (1) {
     GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
-    THD_SLEEP_MS(100); // Fixed time
+    thread_sleep_ms(1000);
   }
-  THD_END();
 }
 
+/* ========================== MAIN ========================= */
+/* ========================================================= */
+/*
+ * this is the main entry point for the application. it initializes the system and the threads
+ */
 int main(void) {
-  /*!< At this stage the microcontroller clock setting is already configured,
-     this is done through SystemInit() function which is called from startup
-     file (startup_GOWIN_M1.s) before to branch to application main.
-     To reconfigure the default setting of SystemInit() function, refer to
-     system_GOWIN_M1.c file
-   */
-  //SystemInit();
+  // initialize the system, including the debug uart, gpio, and delay timer.
+  SystemInit();
+
   debug_init();
   gpio_init();
   delay_init();
 
-  dbg_printf("mini 'bootloader'....\r\n");
+  dbg_printf("SystemCoreClock: %d mHz\r\n", SystemCoreClock / 1000000);
 
   char mfg_id_buffer[MFG_ID_MAX_LEN];
   sysinfo_get_mfg(sysinfo, mfg_id_buffer, sizeof(mfg_id_buffer));
@@ -86,32 +108,41 @@ int main(void) {
   dbg_printf("mfg_id: %s\r\n", mfg_id_buffer);
   dbg_printf("dev version: 0x%08X\r\n", sysinfo->version);
   dbg_printf("dev version: v%d.%d.%d\r\n",
-    (sysinfo->version >> SYSINFO_REGS_VERSION_MAJOR_SHIFT) & 0xFF,
-    (sysinfo->version >> SYSINFO_REGS_VERSION_MINOR_SHIFT) & 0xFF,
-    (sysinfo->version >> SYSINFO_REGS_VERSION_PATCH_SHIFT) & 0xFF);
+             (sysinfo->version >> SYSINFO_REGS_VERSION_MAJOR_SHIFT) & 0xFF,
+             (sysinfo->version >> SYSINFO_REGS_VERSION_MINOR_SHIFT) & 0xFF,
+             (sysinfo->version >> SYSINFO_REGS_VERSION_PATCH_SHIFT) & 0xFF);
   dbg_printf("cheby version: v%d.%d.%d\r\n",
-    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MAJOR_SHIFT) & 0xFF,
-    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
-    (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
+             (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MAJOR_SHIFT) & 0xFF,
+             (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
+             (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
   dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 
 
-  /* Create threads */
-  mkthread(&blinker_thread_wa,
-           sizeof(blinker_thread_wa),
-           0,
-           blinker_thd,
-           NULL);
-  mkthread(&print_thread_wa,
-           sizeof(print_thread_wa),
-           0,
-           print_thd,
-           NULL);
+  // start the scheduler/kernel
+  dbg_printf("initializing kernel...\r\n");
+  kernel_init();
 
+  dbg_printf("creating threads...\r\n");
 
-  // start the scheduler!
+  // idle thread with lowest priority
+  //mkthd_static(idle, idle_fn, sizeof(idle), PRIO_LOW, NULL);
+  mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
+
+  mkthd_static(blink1_thd, blink1_fn, sizeof(blink1_thd), PRIO_NORMAL, NULL);
+  mkthd_static(blink2_thd, blink2_fn, sizeof(blink2_thd), PRIO_NORMAL, NULL);
+
+  dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);
+  dbg_printf("SysTick LOAD: 0x%08X\r\n", SysTick->LOAD);
+  dbg_printf("SysTick CTRL: 0x%08X\r\n", SysTick->CTRL);
+  dbg_printf("__StackLimit: 0x%08X\r\n", (uint32_t)&__StackLimit);
+  dbg_printf("__StackTop:   0x%08X\r\n", (uint32_t)&__StackTop);
+
+  dbg_printf("starting kernel...\r\n");
   kernel_start();
 
+  dbg_printf("main loop...\r\n");
+  while (1) {
+    thread_sleep_ms(100);
+  }
   return 0;
 }
-

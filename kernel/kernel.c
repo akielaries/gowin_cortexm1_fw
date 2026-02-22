@@ -4,16 +4,13 @@
 #include "debug.h"
 
 
+//these are needed by the PendSV handler, so they can't be static
 static thread_t *threads[MAX_THREADS];
 static uint32_t thread_count = 0;
-
-/*
- * these are needed by the PendSV handler, so they can't be static
- */
 thread_t *volatile current_thread = 0;
 
-
 volatile uint32_t system_time_ms = 0;
+volatile uint8_t kernel_running = 0;
 
 /* -------------------------------------------------- */
 /* internal helpers */
@@ -57,7 +54,6 @@ thread_t *thread_create(thread_t *t,
                         size_t stack_size,
                         uint8_t prio,
                         void *arg) {
-  (void)prio;
   (void)arg;
 
   if (thread_count >= MAX_THREADS) {
@@ -68,6 +64,7 @@ thread_t *thread_create(thread_t *t,
   t->stack_size = stack_size;
   t->wake_time  = 0;
   t->state      = THREAD_READY;
+  t->priority   = prio;
 
   init_stack(t, func);
 
@@ -78,32 +75,26 @@ thread_t *thread_create(thread_t *t,
 /* -------------------------------------------------- */
 
 thread_t *scheduler_next(void) {
-  static uint32_t index      = 0;
-  static uint8_t initialized = 0;
-
-  if (!initialized) {
-    initialized = 1;
-    index       = thread_count - 1; /* first increment -> index 0 */
-  }
-
-  for (uint32_t i = 0; i < thread_count; i++) {
-    index       = (index + 1) % thread_count;
-    thread_t *t = threads[index];
-
-    if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
-      // dbg_printf("waking thread, systime=%d wake_time=%d\r\n",
-      //      system_time_ms, t->wake_time);
-
-      t->state = THREAD_READY;
+    // wake any sleeping threads whose time has come
+    for (uint32_t i = 0; i < thread_count; i++) {
+        thread_t *t = threads[i];
+        if (t->state == THREAD_SLEEPING && system_time_ms >= t->wake_time) {
+            t->state = THREAD_READY;
+        }
     }
 
-    if (t->state == THREAD_READY) {
-      return t;
+    // find highest priority ready thread
+    thread_t *best = NULL;
+    for (uint32_t i = 0; i < thread_count; i++) {
+        thread_t *t = threads[i];
+        if (t->state == THREAD_READY) {
+            if (best == NULL || t->priority > best->priority) {
+                best = t;
+            }
+        }
     }
-  }
-  return NULL; /* all sleeping */
+    return best;
 }
-
 void thread_yield(void) {
   // system control block->interrupt control and state reg
   // this bit is going to pend the pendSV exception. not directly invoking a
@@ -135,6 +126,8 @@ void kernel_start(void) {
   NVIC_SetPriority(SysTick_IRQn, 0x00); // highest
 
   uint32_t first_sp = (uint32_t)threads[0]->sp;
+
+  kernel_running = 1;
 
   __asm volatile("msr psp, %0             \n" // PSP = first thread stack
                  "ldr r0, =current_thread \n"

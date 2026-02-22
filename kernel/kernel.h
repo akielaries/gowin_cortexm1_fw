@@ -9,7 +9,7 @@
 typedef enum {
   PRIO_LOW    = 1,
   PRIO_NORMAL = 2,
-  PRIO_HIGH   = 3,
+  PRIO_HIGH   = 3, // if a thread is HIGH priority it will ALWAYS run first
 } thread_prio_e;
 
 typedef enum {
@@ -22,7 +22,7 @@ typedef struct thread {
   uint32_t *sp; // saved stack pointer
   volatile uint32_t wake_time;
   thread_state_e state;
-  // uint8_t priority;
+  uint8_t priority;
   uint8_t *stack_mem;
   size_t stack_size;
 } thread_t;
@@ -35,6 +35,7 @@ extern volatile uint32_t system_time_ms;
  */
 extern thread_t *volatile current_thread;
 thread_t *scheduler_next(void);
+extern volatile uint8_t kernel_running;
 
 /* kernel lifecycle */
 void kernel_init(void);

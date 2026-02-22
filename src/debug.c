@@ -2,21 +2,6 @@
 #include "debug.h"
 #include <stdbool.h>
 
-// Helper function to print a number in decimal
-static void print_number(int n) {
-    if (n < 0) {
-        UART_SendChar(UART1, '-');
-        n = -n;
-    }
-    if (n == 0) {
-        UART_SendChar(UART1, '0');
-        return;
-    }
-    if (n / 10) {
-        print_number(n / 10);
-    }
-    UART_SendChar(UART1, (n % 10) + '0');
-}
 
 // Helper function to print a number in hexadecimal
 static void print_hex(unsigned int value, int padding, bool print_prefix) {
@@ -56,7 +41,7 @@ static void print_hex(unsigned int value, int padding, bool print_prefix) {
 void debug_init(void) {
   UART_InitTypeDef UART_InitStruct;
 
-  UART_InitStruct.UART_BaudRate         = 115200;
+  UART_InitStruct.UART_BaudRate         = 230400;
   UART_InitStruct.UART_Mode.UARTMode_Tx = ENABLE;
   UART_InitStruct.UART_Mode.UARTMode_Rx = ENABLE;
   UART_InitStruct.UART_Int.UARTInt_Tx   = DISABLE;
@@ -66,6 +51,38 @@ void debug_init(void) {
   UART_InitStruct.UART_Hstm             = DISABLE;
 
   UART_Init(UART1, &UART_InitStruct);
+}
+
+// Helper function to print a number in decimal
+static void print_number_u(uint32_t n) {
+    if (n == 0) {
+        UART_SendChar(UART1, '0');
+        return;
+    }
+    char buf[10];  // max uint32 is 4294967295, 10 digits
+    int i = 0;
+    while (n > 0) {
+        buf[i++] = '0' + (n % 10);
+        n /= 10;
+    }
+    while (i > 0) {
+        UART_SendChar(UART1, buf[--i]);
+    }
+}
+
+static void print_number(int n) {
+    if (n < 0) {
+        UART_SendChar(UART1, '-');
+        n = -n;
+    }
+    if (n == 0) {
+        UART_SendChar(UART1, '0');
+        return;
+    }
+    if (n / 10) {
+        print_number(n / 10);
+    }
+    UART_SendChar(UART1, (n % 10) + '0');
 }
 
 void dbg_printf(const char* format, ...) {
@@ -94,6 +111,11 @@ void dbg_printf(const char* format, ...) {
         case 'd': {
           int i = va_arg(args, int);
           print_number(i);
+          break;
+        }
+        case 'u': {
+          uint32_t u = va_arg(args, uint32_t);
+          print_number_u(u);
           break;
         }
         case 's': {

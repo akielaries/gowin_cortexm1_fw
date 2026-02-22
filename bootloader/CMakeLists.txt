@@ -5,7 +5,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/lib)
 
 # Linker script for the bootloader (assuming it uses the same one for now)
 set(LINKER_SCRIPT
-    ${CMAKE_SOURCE_DIR}/bsp/gowin/startup/linker/GOWIN_M1_flash_burn.ld
+    ${CMAKE_SOURCE_DIR}/bsp/startup/linker/GOWIN_M1_flash_burn.ld
 )
 
 # Bootloader source files
@@ -13,15 +13,15 @@ file(GLOB_RECURSE BOOTLOADER_SOURCES
     boot.c
     ${CMAKE_SOURCE_DIR}/src/debug.c
     ${CMAKE_SOURCE_DIR}/src/delay.c
-    ${CMAKE_SOURCE_DIR}/src/GOWIN_M1_it.c
     ${CMAKE_SOURCE_DIR}/src/gpio.c
-    ${CMAKE_SOURCE_DIR}/bsp/gowin/system/*.c
-    ${CMAKE_SOURCE_DIR}/drivers/src/*.c
+    ${CMAKE_SOURCE_DIR}/bsp/system/*.c
+    ${CMAKE_SOURCE_DIR}/bsp/drivers/src/*.c
     ${CMAKE_SOURCE_DIR}/kernel/*.c
+    ${CMAKE_SOURCE_DIR}/kernel/pendsv.S
 )
 
 file(GLOB STARTUP_SOURCES
-    ${CMAKE_SOURCE_DIR}/bsp/gowin/startup/*.S
+    ${CMAKE_SOURCE_DIR}/bsp/startup/*.S
 )
 
 # Define the bootloader executable
@@ -34,9 +34,9 @@ add_executable(bootloader.elf
 target_include_directories(bootloader.elf PRIVATE
     ${CMAKE_SOURCE_DIR}/kernel
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/bsp/gowin/core
-    ${CMAKE_SOURCE_DIR}/bsp/gowin/system
-    ${CMAKE_SOURCE_DIR}/drivers/inc
+    ${CMAKE_SOURCE_DIR}/bsp/core
+    ${CMAKE_SOURCE_DIR}/bsp/system
+    ${CMAKE_SOURCE_DIR}/bsp/drivers/inc
     ${CMAKE_SOURCE_DIR}/cheby
 )
 
@@ -52,6 +52,11 @@ target_compile_options(bootloader.elf PRIVATE
     -fsigned-char
     -ffunction-sections
     -fdata-sections
+
+    -ffixed-r8
+    -ffixed-r9
+    -ffixed-r10
+    -ffixed-r11
 
     -std=gnu11
 )

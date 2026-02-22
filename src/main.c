@@ -52,6 +52,16 @@ void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo,
 }
 
 
+/* ========================================================= */
+
+// IDLE THREAD! this should ideally just be main() i think but idk
+THREAD_STACK(idle, 256);
+THREAD_FUNCTION(idle_fn, arg) {
+  while (1) {
+    __WFI();
+  }
+}
+
 THREAD_STACK(uptime, 512);
 THREAD_FUNCTION(uptime_fn, arg) {
   while (1) {
@@ -78,10 +88,18 @@ THREAD_FUNCTION(blink2_fn, arg) {
   }
 }
 
+THREAD_STACK(fast_thd, 256);
+THREAD_FUNCTION(fast_fn, arg) {
+  while (1) {
+    GPIO_ToggleBit(GPIO0, GPIO_Pin_2);
+    //thread_sleep_ms(2);
+  }
+}
+
 // basic thread that just yields
 // some CPU heavy task that will spit out the result every few seconds or
 // something related
-THREAD_STACK(compute_thd, 256);
+THREAD_STACK(compute_thd, 512);
 THREAD_FUNCTION(compute_fn, arg) {
   while (1) {
     uint32_t iters = 5000000 + (lcg_rand() % 5000000); // 5M–10M iters
@@ -96,12 +114,10 @@ THREAD_FUNCTION(compute_fn, arg) {
     }
 
     uint32_t elapsed = system_time_ms - t_start;
-    dbg_printf("compute result: %d, took %d ms (%d iters)\r\n", result, elapsed, iters);
+    dbg_printf("compute result: %u, took %d ms (%d iters)\r\n", result, elapsed, iters);
   }
 }
 
-
-/* ========================================================= */
 /* ========================== MAIN ========================= */
 /* ========================================================= */
 /*
@@ -110,6 +126,9 @@ THREAD_FUNCTION(compute_fn, arg) {
 int main(void) {
   // initialize the system, including the debug uart, gpio, and delay timer.
   SystemInit();
+
+  //bsp_init();
+
   debug_init();
   gpio_init();
   delay_init();
@@ -134,14 +153,20 @@ int main(void) {
 
 
   // start the scheduler/kernel
-  dbg_printf("stackful kernel starting...\r\n");
+  dbg_printf("initializing kernel...\r\n");
   kernel_init();
 
   dbg_printf("creating threads...\r\n");
+
+  // idle thread with lowest priority
+  mkthd_static(idle, idle_fn, sizeof(idle), PRIO_LOW, NULL);
   mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
+
   mkthd_static(blink1_thd, blink1_fn, sizeof(blink1_thd), PRIO_NORMAL, NULL);
   mkthd_static(blink2_thd, blink2_fn, sizeof(blink2_thd), PRIO_NORMAL, NULL);
-  mkthd_static(compute_thd, compute_fn, sizeof(compute_thd), PRIO_NORMAL, NULL);
+  mkthd_static(fast_thd, fast_fn, sizeof(fast_thd), PRIO_NORMAL, NULL);
+
+  mkthd_static(compute_thd, compute_fn, sizeof(compute_thd), PRIO_LOW, NULL);
 
 
   dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);

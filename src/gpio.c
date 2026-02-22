@@ -7,8 +7,8 @@ void gpio_init(void) {
 
   //Initializes GPIO pin 0-4 as output
   GPIO_InitType.GPIO_Pin = GPIO_Pin_0 |
-		  	  	  	  	   GPIO_Pin_1 /*|
-                           GPIO_Pin_2 |
+		  	  	  	  	       GPIO_Pin_1 |
+                           GPIO_Pin_2 /*|
                            GPIO_Pin_3 |
                            GPIO_Pin_4 |
                            GPIO_Pin_5 |
