@@ -98,6 +98,7 @@ int main(void) {
   debug_init();
   gpio_init();
   delay_init();
+  dbg_printf("\r\n");
 
   dbg_printf("SystemCoreClock: %d mHz\r\n", SystemCoreClock / 1000000);
 
