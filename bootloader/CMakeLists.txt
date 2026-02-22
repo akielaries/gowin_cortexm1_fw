@@ -14,6 +14,7 @@ file(GLOB_RECURSE BOOTLOADER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/debug.c
     ${CMAKE_SOURCE_DIR}/src/delay.c
     ${CMAKE_SOURCE_DIR}/src/gpio.c
+    ${CMAKE_SOURCE_DIR}/src/hw.c
     ${CMAKE_SOURCE_DIR}/bsp/system/*.c
     ${CMAKE_SOURCE_DIR}/bsp/drivers/src/*.c
     ${CMAKE_SOURCE_DIR}/kernel/*.c

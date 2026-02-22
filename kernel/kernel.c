@@ -12,6 +12,10 @@ thread_t *volatile current_thread = 0;
 volatile uint32_t system_time_ms = 0;
 volatile uint8_t kernel_running = 0;
 
+extern uint32_t __StackLimit;
+extern uint32_t __StackTop;
+
+
 /* -------------------------------------------------- */
 /* internal helpers */
 /* -------------------------------------------------- */
@@ -46,6 +50,10 @@ static void init_stack(thread_t *new_thread, void (*entry)(void)) {
 
 void kernel_init(void) {
   thread_count = 0;
+  dbg_printf("SysTick LOAD: 0x%08X\r\n", SysTick->LOAD);
+  dbg_printf("SysTick CTRL: 0x%08X\r\n", SysTick->CTRL);
+  dbg_printf("__StackLimit: 0x%08X\r\n", (uint32_t)&__StackLimit);
+  dbg_printf("__StackTop:   0x%08X\r\n", (uint32_t)&__StackTop);
 }
 
 thread_t *thread_create(thread_t *t,
