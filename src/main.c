@@ -60,7 +60,6 @@ THREAD_FUNCTION(fast_fn, arg) {
   while (1) {
     GPIO_ToggleBit(GPIO0, GPIO_Pin_2);
     //thread_sleep_ms(2);
-    thread_yield();
   }
 }
 
@@ -78,7 +77,7 @@ THREAD_FUNCTION(compute_fn, arg) {
     for (uint32_t i = 0; i < iters; i++) {
       result += i * i;
       if ((i % 1000) == 0)
-        thread_yield();
+        thread_yield(); // could remove this manual yield
     }
 
     uint32_t elapsed = system_time_ms - t_start;
@@ -106,9 +105,9 @@ int main(void) {
 
   mkthd_static(blink1_thd, blink1_fn, sizeof(blink1_thd), PRIO_NORMAL, NULL);
   mkthd_static(blink2_thd, blink2_fn, sizeof(blink2_thd), PRIO_NORMAL, NULL);
-  mkthd_static(fast_thd, fast_fn, sizeof(fast_thd), PRIO_LOW, NULL);
 
-  mkthd_static(compute_thd, compute_fn, sizeof(compute_thd), PRIO_NORMAL, NULL);
+  mkthd_static(fast_thd, fast_fn, sizeof(fast_thd), PRIO_LOW, NULL);
+  mkthd_static(compute_thd, compute_fn, sizeof(compute_thd), PRIO_LOW, NULL);
 
 
   dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);

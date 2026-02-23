@@ -71,6 +71,4 @@ void hw_init(void) {
              (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
              (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
   //dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
-
 }
-

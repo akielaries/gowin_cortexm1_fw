@@ -1,9 +1,8 @@
-# Set output directories for the bootloader
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/bin)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bootloader/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/itcm/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/itcm/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/itcm/lib)
 
-# Linker script for the bootloader (assuming it uses the same one for now)
+# Linker script for the itcm (assuming it uses the same one for now)
 set(LINKER_SCRIPT
     ${CMAKE_SOURCE_DIR}/bsp/startup/linker/GOWIN_M1_flash_burn.ld
 )
@@ -25,14 +24,14 @@ file(GLOB STARTUP_SOURCES
     ${CMAKE_SOURCE_DIR}/bsp/startup/*.S
 )
 
-# Define the bootloader executable
-add_executable(bootloader.elf
+# Define the itcm executable
+add_executable(itcm.elf
     ${STARTUP_SOURCES}
     ${BOOTLOADER_SOURCES}
 )
 
-# Include directories for the bootloader
-target_include_directories(bootloader.elf PRIVATE
+# Include directories for the itcm
+target_include_directories(itcm.elf PRIVATE
     ${CMAKE_SOURCE_DIR}/kernel
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/bsp/core
@@ -42,7 +41,7 @@ target_include_directories(bootloader.elf PRIVATE
 )
 
 # CPU + Compile options (same as main project)
-target_compile_options(bootloader.elf PRIVATE
+target_compile_options(itcm.elf PRIVATE
     -mcpu=cortex-m1
     -mthumb
 
@@ -63,26 +62,26 @@ target_compile_options(bootloader.elf PRIVATE
 )
 
 # Linker options (same as main project)
-target_link_options(bootloader.elf PRIVATE
+target_link_options(itcm.elf PRIVATE
     -mcpu=cortex-m1
     -mthumb
 
     -T ${LINKER_SCRIPT}
 
     -Wl,--gc-sections
-    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootloader.map
+    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/itcm.map
 )
 
 # Post-build: generate .bin
-add_custom_command(TARGET bootloader.elf POST_BUILD
+add_custom_command(TARGET itcm.elf POST_BUILD
     COMMAND ${CMAKE_OBJCOPY}
             -O binary
-            $<TARGET_FILE:bootloader.elf>
-            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bootloader.bin
+            $<TARGET_FILE:itcm.elf>
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/itcm.bin
 )
 
 # Post-build: print size
-add_custom_command(TARGET bootloader.elf POST_BUILD
+add_custom_command(TARGET itcm.elf POST_BUILD
     COMMAND ${CMAKE_SOURCE_DIR}/scripts/size_summary.sh
-            $<TARGET_FILE:bootloader.elf>
+            $<TARGET_FILE:itcm.elf>
 )
