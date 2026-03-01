@@ -69,30 +69,54 @@ Continuing.
 The code here will output a print message to the wired up serial console
 
 ```
-tio -t -b 230400 /dev/serial/by-id/usb-1a86_USB_Serial-if00-port0
-[tio 02:06:21] tio v1.32
-[tio 02:06:21] Press ctrl-t q to quit
-[tio 02:06:21] Connected
-[02:06:23] �
-[02:06:23] SystemCoreClock: 50 mHz
-[02:06:23] magic: 0xDEADBEEF
-[02:06:23] mfg_id: Gowin60K
-[02:06:23] dev version: 0x00010000
-[02:06:23] dev version: v1.0.0
-[02:06:23] cheby version: v1.7.0
-[02:06:23] gpio stat: 0x00C0FFEE
-[02:06:23] initializing kernel...
-[02:06:23] creating threads...
-[02:06:23] system_time_ms before start: 8
-[02:06:23] SysTick LOAD: 0x0000C34F
-[02:06:23] SysTick CTRL: 0x00010007
-[02:06:23] __StackLimit: 0x2000E000
-[02:06:23] __StackTop:   0x20010000
-[02:06:23] starting kernel...
-[02:06:23] uptime: 0s
-[02:06:24] uptime: 1s
-[02:06:25] uptime: 2s
-[02:06:26] uptime: 3s
-[02:06:27] uptime: 4s
-[02:06:28] uptime: 5s
+[05:23:45] SystemCoreClock: 50 mHz
+[05:23:45] magic: 0xDEADBEEF
+[05:23:45] mfg_id: Gowin60K
+[05:23:45] dev version: 0x00010000
+[05:23:45] dev version: v1.0.0
+[05:23:45] cheby version: v1.7.0
+[05:23:45] DDR3 init
+[05:23:45] DDR3 controller base: 0x88000000
+[05:23:45] Pre-init: WR_EN=0 RD_EN=0 INIT=1
+[05:23:45] Waiting for DDR3 initialization...
+[05:23:45] SUCCESS: DDR3 initialized! INIT=0x00000001
+[05:23:45] DDR3 init status: 1
+[05:23:45] DDR3 test (16-byte aligned)
+[05:23:45] Writing 6 blocks with 16-byte increment...
+[05:23:45] Reading back...
+[05:23:45] Results:
+[05:23:45] Block 0: 0x91234567 0x89ABCDEF 0xFEDCBA98 0x76543210 OK
+[05:23:45] Block 1: 0x66666666 0x88888888 0xEEEEEEEE 0xFFFFFFFF OK
+[05:23:45] Block 2: 0x00000001 0x00000002 0x00000003 0x00000004 OK
+[05:23:45] Block 3: 0x00000005 0x00000006 0x00000007 0x00000008 OK
+[05:23:45] Block 4: 0x00000009 0x0000000A 0x0000000B 0x0000000C OK
+[05:23:45] Block 5: 0x0000000D 0x0000000E 0x0000000F 0x00000010 OK
+[05:23:45] initializing kernel...
+[05:23:45] SysTick LOAD: 0x0000C34F
+[05:23:45] SysTick CTRL: 0x00010007
+[05:23:45] __StackLimit: 0x2000E000
+[05:23:45] __StackTop:   0x20010000
+[05:23:45] creating threads...
+[05:23:45] system_time_ms before start: 39
+[05:23:45] starting kernel...
+[05:23:45] uptime: pin0
+[05:23:45] pin1
+[05:23:45] 0s
+[05:23:45] pin0
+[05:23:46] uptime: 1s
+[05:23:46] pin0
+[05:23:46] pin1
+[05:23:46] pin0
+[05:23:47] uptime: 2s
+[05:23:47] pin0
+[05:23:47] pin1
+[05:23:47] pin0
+[05:23:48] uptime: 3s
+[05:23:48] pin0
+[05:23:48] pin1
+[05:23:48] pin0
+[05:23:49] uptime: 4s
+[05:23:49] pin0
+[05:23:49] pin1
+[05:23:49] pin0
 ```
