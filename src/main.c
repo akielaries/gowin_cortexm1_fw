@@ -208,6 +208,221 @@ void ddr3_rw_test(void) {
   }
 }
 
+void ddr3_rw_magic_test(void) {
+  dbg_printf("\r\n=== DDR3 Magic Value RW Test ===\r\n");
+
+  uint32_t errors = 0;
+  static uint32_t write_buf[4];
+  static uint32_t read_buf[4];
+
+  // Test bottom of memory
+  uint32_t bottom_addr = 0x00000000;
+  dbg_printf("Testing bottom of memory: 0x%08X\r\n", bottom_addr);
+
+  // Prepare magic value
+  write_buf[0] = 0xDEADBEEF;
+  write_buf[1] = 0xCAFEF00D;
+  write_buf[2] = 0x12345678;
+  write_buf[3] = 0x9ABCDEF0;
+
+  // Write and read back
+  DDR3_Write(bottom_addr, write_buf);
+  DDR3_Read(bottom_addr, read_buf);
+
+  dbg_printf("  Read at 0x%08X: 0x%08X 0x%08X 0x%08X 0x%08X\r\n",
+             bottom_addr, read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
+
+  // Verify
+  for (int i = 0; i < 4; i++) {
+    if (read_buf[i] != write_buf[i]) {
+      dbg_printf("  ERROR at 0x%08X[%d]: expected 0x%08X, read 0x%08X\r\n",
+                 bottom_addr, i, write_buf[i], read_buf[i]);
+      errors++;
+    }
+  }
+
+  // Test top of memory
+  uint32_t top_addr = 0xFFFFFFF0; // Last 16-byte boundary
+  dbg_printf("Testing top of memory: 0x%08X\r\n", top_addr);
+
+  // Prepare different magic value
+  write_buf[0] = 0xA5A5A5A5;
+  write_buf[1] = 0x5A5A5A5A;
+  write_buf[2] = 0xFF00FF00;
+  write_buf[3] = 0x00FF00FF;
+
+  // Write and read back
+  DDR3_Write(top_addr, write_buf);
+  DDR3_Read(top_addr, read_buf);
+
+  dbg_printf("  Read at 0x%08X: 0x%08X 0x%08X 0x%08X 0x%08X\r\n",
+             top_addr, read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
+
+  // Verify
+  for (int i = 0; i < 4; i++) {
+    if (read_buf[i] != write_buf[i]) {
+      dbg_printf("  ERROR at 0x%08X[%d]: expected 0x%08X, read 0x%08X\r\n",
+                 top_addr, i, write_buf[i], read_buf[i]);
+      errors++;
+    }
+  }
+
+  if (errors == 0) {
+    dbg_printf("PASS: DDR3 Magic Value RW Test succeeded!\r\n");
+  } else {
+    dbg_printf("FAIL: DDR3 Magic Value RW Test failed with %d errors.\r\n", errors);
+  }
+}
+
+void ddr3_size_test(void) {
+    dbg_printf("\r\n=== DDR3 Size Test ===\r\n");
+    
+    static uint32_t write_buf[4];
+    static uint32_t read_buf[4];
+    
+    // Write unique pattern at start
+    write_buf[0] = 0xAAAAAAAA;
+    write_buf[1] = 0xBBBBBBBB;
+    write_buf[2] = 0xCCCCCCCC;
+    write_buf[3] = 0xDDDDDDDD;
+    DDR3_Write(0x00000000, write_buf);
+    
+    // Test boundaries to find actual size
+    uint32_t test_addrs[] = {
+        0x1FFFFFF0,  // 512MB - 16 bytes (actual chip size)
+        0x2FFFFFF0,  // 768MB
+        0x3FFFFFF0,  // 1GB
+        0x7FFFFFF0,  // 2GB
+        0xFFFFFFF0   // 4GB
+    };
+    
+    for (int i = 0; i < 5; i++) {
+        uint32_t addr = test_addrs[i];
+        
+        // Write unique pattern
+        write_buf[0] = 0x10000000 + i;
+        write_buf[1] = 0x20000000 + i;
+        write_buf[2] = 0x30000000 + i;
+        write_buf[3] = 0x40000000 + i;
+        DDR3_Write(addr, write_buf);
+        
+        // Read back
+        DDR3_Read(addr, read_buf);
+        
+        dbg_printf("Addr 0x%08X (%dMB): ", addr, addr >> 20);
+        if (read_buf[0] == write_buf[0]) {
+            dbg_printf("OK - Unique data\r\n");
+        } else {
+            dbg_printf("MIRROR - reads 0x%08X (might wrap to start)\r\n", read_buf[0]);
+        }
+    }
+    
+    // Check if 512MB boundary wrapped to start
+    DDR3_Read(0x00000000, read_buf);
+    dbg_printf("\nAddress 0x00000000 now reads: 0x%08X\r\n", read_buf[0]);
+    if (read_buf[0] == 0xAAAAAAAA) {
+        dbg_printf("Start unchanged - no wraparound\r\n");
+    } else {
+        dbg_printf("Start changed - memory aliases/wraps!\r\n");
+    }
+}
+
+void test_ahb1_rw(void) {
+    dbg_printf("\r\n=== Testing AHB1 R/W ===\r\n");
+
+    // Try writing/reading via direct pointer access
+    volatile uint32_t *ahb_m1 = (volatile uint32_t *)0x80000000;
+
+    dbg_printf("Writing 0xDEADBEEF to 0x80000000...\r\n");
+    ahb_m1[0] = 0xDEADBEEF;
+
+    dbg_printf("Reading back from 0x80000000...\r\n");
+    uint32_t read_val = ahb_m1[0];
+    dbg_printf("Read: 0x%08X\r\n", read_val);
+
+    if (read_val == 0xDEADBEEF) {
+        dbg_printf("SUCCESS! AHB window is memory-mapped!\r\n");
+
+        // Try writing a pattern
+        dbg_printf("Writing pattern...\r\n");
+        for (int i = 0; i < 16; i++) {
+            ahb_m1[i] = i * 0x11111111;
+        }
+
+        dbg_printf("reading pattern back...\r\n");
+        for (int i = 0; i < 16; i++) {
+            dbg_printf("  [0x%08X] = 0x%08X\r\n",
+                       0x80000000 + (i*4), ahb_m1[i]);
+        }
+    } else {
+        dbg_printf("FAILED: read 0x%08X, not memory-mapped or no DDR3 there\r\n", read_val);
+    }
+}
+
+void test_ahb1_16kb(void) {
+    dbg_printf("\r\n=== Testing AHB1 16KB RAM Boundaries ===\r\n");
+
+    volatile uint32_t *base = (uint32_t *)0x80000000;
+    volatile uint32_t *last = (uint32_t *)(0x80000000 + 16384 - 4);   // 0x80003FFC
+
+    // 1. First word
+    dbg_printf("First word (0x80000000): ");
+    base[0] = 0xDEADBEEF;
+    uint32_t val = base[0];
+    dbg_printf("write 0xDEADBEEF, read 0x%08X %s\r\n", val,
+               (val == 0xDEADBEEF) ? "OK" : "FAIL");
+
+    // 2. Last word
+    dbg_printf("Last word  (0x80003FFC): ");
+    *last = 0xCAFEBABE;
+    val = *last;
+    dbg_printf("write 0xCAFEBABE, read 0x%08X %s\r\n", val,
+               (val == 0xCAFEBABE) ? "OK" : "FAIL");
+
+    // 3. Middle word (2 KB offset)
+    volatile uint32_t *mid = (uint32_t *)(0x80000000 + 2048);   // 0x80000800
+    dbg_printf("Middle word (0x80000800): ");
+    *mid = 0x12345678;
+    val = *mid;
+    dbg_printf("write 0x12345678, read 0x%08X %s\r\n", val,
+               (val == 0x12345678) ? "OK" : "FAIL");
+
+    // --- Reset base word to a known pattern for byte/halfword tests ---
+    base[0] = 0xA5A5A5A5;   // known pattern: 0xA5A5A5A5
+
+    // 4. Byte access at first address
+    volatile uint8_t *byte_ptr = (uint8_t *)0x80000000;
+    dbg_printf("Byte access at 0x80000000: ");
+    byte_ptr[0] = 0xAA;                 // write LSB
+    uint8_t bval = byte_ptr[0];
+    val = base[0];
+    dbg_printf("write 0xAA, read 0x%02X ", bval);
+    // Expect LSB = 0xAA, rest unchanged (0xA5A5A5)
+    dbg_printf("(word now 0x%08X) %s\r\n", val,
+               (bval == 0xAA && val == 0xA5A5A5AA) ? "OK" : "FAIL");
+
+    // 5. Halfword access at first address (after resetting again)
+    base[0] = 0xA5A5A5A5;   // reset
+    volatile uint16_t *half_ptr = (uint16_t *)0x80000000;
+    dbg_printf("Halfword access at 0x80000000: ");
+    half_ptr[0] = 0xBEEF;                // write lower halfword
+    uint16_t hval = half_ptr[0];
+    val = base[0];
+    dbg_printf("write 0xBEEF, read 0x%04X ", hval);
+    // Expect lower halfword = 0xBEEF, upper half unchanged (0xA5A5)
+    dbg_printf("(word now 0x%08X) %s\r\n", val,
+               (hval == 0xBEEF && val == 0xA5A5BEEF) ? "OK" : "FAIL");
+
+    // 6. Optional: test byte at the top of the block
+    volatile uint8_t *top_byte = (uint8_t *)(0x80000000 + 16384 - 1);
+    dbg_printf("Byte at top (0x80003FFF): ");
+    *top_byte = 0x55;
+    uint8_t tval = *top_byte;
+    dbg_printf("write 0x55, read 0x%02X %s\r\n", tval,
+               (tval == 0x55) ? "OK" : "FAIL");
+
+    dbg_printf("=== AHB1 16KB test completed ===\r\n");
+}
 /* ========================== MAIN ========================= */
 /* ========================================================= */
 /*
@@ -222,7 +437,12 @@ int main(void) {
   dbg_printf("DDR3 init status: %d\r\n", status);
 
   ddr3_rw_test();
+  ddr3_rw_magic_test();
+  ddr3_size_test();
   // ddr3_pattern_test();
+
+  test_ahb1_rw();
+  test_ahb1_16kb();
 
   // start the scheduler/kernel
   dbg_printf("initializing kernel...\r\n");

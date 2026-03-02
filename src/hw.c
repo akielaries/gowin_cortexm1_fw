@@ -10,6 +10,7 @@
 #include "sys_defs.h"
 
 #include "sysinfo_regs.h"
+#include "gpio_regs.h"
 
 #include "GOWIN_M1.h"
 
@@ -70,5 +71,10 @@ void hw_init(void) {
              (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MAJOR_SHIFT) & 0xFF,
              (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_MINOR_SHIFT) & 0xFF,
              (sysinfo->cheby_version >> SYSINFO_REGS_CHEBY_VERSION_PATCH_SHIFT) & 0xFF);
-  //dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
+
+  // test writing to the R/W reg for gpio->out
+  gpio->out = 0x0BADC0DE;
+
+  dbg_printf("gpio out: 0x%08X\r\n", gpio->out);
+  dbg_printf("gpio stat: 0x%08X\r\n", gpio->stat);
 }

@@ -512,6 +512,7 @@ typedef struct
 #define CAN_BASE          (AHB1PERIPH_BASE + 0x5000000)    /* !< CAN Base Address       */
 #define ENT_BASE          (AHB1PERIPH_BASE + 0x6000000)    /* !< Ethernet Base Address  */
 #define DDR3_BASE         (AHB2PERIPH_BASE + 0x8000000)    /* !< DDR3 Base Address      */
+//#define DDR3_BASE         (APB2PERIPH_BASE + 0x1000)
 #define PSRAM_BASE        (AHB2PERIPH_BASE + 0x2000000)    /* !< PSRAM Base Address     */
 
 /* AHB2 Peripheral base address */
