@@ -12,6 +12,12 @@
 #include <stdint.h>
 
 
+#define USE_AHB1
+#define USE_DDR3
+
+#define GW5AST_138
+//#define GW5AT_60 1
+
 // dummy generator
 static uint32_t lcg_state = 12345;
 
@@ -41,7 +47,7 @@ THREAD_FUNCTION(uptime_fn, arg) {
 THREAD_STACK(blink1_thd, 512);
 THREAD_FUNCTION(blink1_fn, arg) {
   while (1) {
-    dbg_printf("pin0\r\n");
+    //dbg_printf("pin0\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
     thread_sleep_ms(500);
   }
@@ -50,7 +56,7 @@ THREAD_FUNCTION(blink1_fn, arg) {
 THREAD_STACK(blink2_thd, 512);
 THREAD_FUNCTION(blink2_fn, arg) {
   while (1) {
-    dbg_printf("pin1\r\n");
+    //dbg_printf("pin1\r\n");
     GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
     thread_sleep_ms(1000);
   }
@@ -63,6 +69,55 @@ THREAD_FUNCTION(fast_fn, arg) {
     // thread_sleep_ms(2);
   }
 }
+
+
+THREAD_STACK(sfp_thd, 512);
+THREAD_FUNCTION(sfp_fn, arg) {
+  while (1) {
+    uint32_t s  = sfp->stat;
+    uint32_t s0 = sfp->ln0_rx_snap;
+    uint32_t s1 = sfp->ln1_rx_snap;
+
+    // extract each field using the cheby-generated mask+shift constants
+    uint32_t ln0_sig   = (s & SFP_REGS_STAT_LN0_SIGNAL_DETECT_MASK)  >> SFP_REGS_STAT_LN0_SIGNAL_DETECT_SHIFT;
+    uint32_t ln0_cdr   = (s & SFP_REGS_STAT_LN0_RX_CDR_LOCK_MASK)    >> SFP_REGS_STAT_LN0_RX_CDR_LOCK_SHIFT;
+    uint32_t ln0_klock = (s & SFP_REGS_STAT_LN0_K_LOCK_MASK)         >> SFP_REGS_STAT_LN0_K_LOCK_SHIFT;
+    uint32_t ln0_align = (s & SFP_REGS_STAT_LN0_WORD_ALIGN_LINK_MASK) >> SFP_REGS_STAT_LN0_WORD_ALIGN_LINK_SHIFT;
+    uint32_t ln0_pll   = (s & SFP_REGS_STAT_LN0_PLL_LOCK_MASK)       >> SFP_REGS_STAT_LN0_PLL_LOCK_SHIFT;
+    uint32_t ln0_rdy   = (s & SFP_REGS_STAT_LN0_READY_MASK)          >> SFP_REGS_STAT_LN0_READY_SHIFT;
+    uint32_t ln0_prbs  = (s & SFP_REGS_STAT_LN0_PRBS_LOCK_MASK)      >> SFP_REGS_STAT_LN0_PRBS_LOCK_SHIFT;
+    uint32_t ln0_rxv   = (s & SFP_REGS_STAT_LN0_RX_VALID_MASK)       >> SFP_REGS_STAT_LN0_RX_VALID_SHIFT;
+    uint32_t ln0_rxfe  = (s & SFP_REGS_STAT_LN0_RX_FIFO_EMPTY_MASK)  >> SFP_REGS_STAT_LN0_RX_FIFO_EMPTY_SHIFT;
+    uint32_t ln0_txaf  = (s & SFP_REGS_STAT_LN0_TX_FIFO_AFULL_MASK)  >> SFP_REGS_STAT_LN0_TX_FIFO_AFULL_SHIFT;
+    uint32_t ln0_txf   = (s & SFP_REGS_STAT_LN0_TX_FIFO_FULL_MASK)   >> SFP_REGS_STAT_LN0_TX_FIFO_FULL_SHIFT;
+
+    uint32_t ln1_sig   = (s & SFP_REGS_STAT_LN1_SIGNAL_DETECT_MASK)  >> SFP_REGS_STAT_LN1_SIGNAL_DETECT_SHIFT;
+    uint32_t ln1_cdr   = (s & SFP_REGS_STAT_LN1_RX_CDR_LOCK_MASK)    >> SFP_REGS_STAT_LN1_RX_CDR_LOCK_SHIFT;
+    uint32_t ln1_klock = (s & SFP_REGS_STAT_LN1_K_LOCK_MASK)         >> SFP_REGS_STAT_LN1_K_LOCK_SHIFT;
+    uint32_t ln1_align = (s & SFP_REGS_STAT_LN1_WORD_ALIGN_LINK_MASK) >> SFP_REGS_STAT_LN1_WORD_ALIGN_LINK_SHIFT;
+    uint32_t ln1_pll   = (s & SFP_REGS_STAT_LN1_PLL_LOCK_MASK)       >> SFP_REGS_STAT_LN1_PLL_LOCK_SHIFT;
+    uint32_t ln1_rdy   = (s & SFP_REGS_STAT_LN1_READY_MASK)          >> SFP_REGS_STAT_LN1_READY_SHIFT;
+    uint32_t ln1_prbs  = (s & SFP_REGS_STAT_LN1_PRBS_LOCK_MASK)      >> SFP_REGS_STAT_LN1_PRBS_LOCK_SHIFT;
+    uint32_t ln1_rxv   = (s & SFP_REGS_STAT_LN1_RX_VALID_MASK)       >> SFP_REGS_STAT_LN1_RX_VALID_SHIFT;
+    uint32_t ln1_rxfe  = (s & SFP_REGS_STAT_LN1_RX_FIFO_EMPTY_MASK)  >> SFP_REGS_STAT_LN1_RX_FIFO_EMPTY_SHIFT;
+    uint32_t ln1_txaf  = (s & SFP_REGS_STAT_LN1_TX_FIFO_AFULL_MASK)  >> SFP_REGS_STAT_LN1_TX_FIFO_AFULL_SHIFT;
+    uint32_t ln1_txf   = (s & SFP_REGS_STAT_LN1_TX_FIFO_FULL_MASK)   >> SFP_REGS_STAT_LN1_TX_FIFO_FULL_SHIFT;
+
+    dbg_printf("--- SFP stat: 0x%08X ---\r\n", s);
+    dbg_printf("  LN0: sig=%d cdr=%d klock=%d align=%d pll=%d rdy=%d prbs=%d rxv=%d rxfe=%d txaf=%d txf=%d\r\n",
+               ln0_sig, ln0_cdr, ln0_klock, ln0_align, ln0_pll, ln0_rdy, ln0_prbs,
+               ln0_rxv, ln0_rxfe, ln0_txaf, ln0_txf);
+    dbg_printf("  LN1: sig=%d cdr=%d klock=%d align=%d pll=%d rdy=%d prbs=%d rxv=%d rxfe=%d txaf=%d txf=%d\r\n",
+               ln1_sig, ln1_cdr, ln1_klock, ln1_align, ln1_pll, ln1_rdy, ln1_prbs,
+               ln1_rxv, ln1_rxfe, ln1_txaf, ln1_txf);
+    dbg_printf("  snap: ln0=0x%08X  ln1=0x%08X\r\n", s0, s1);
+    dbg_printf("    ln0[8:0]=0x%03X (%s)  ln1[8:0]=0x%03X (%s)\r\n",
+               s0 & 0x1FF, ((s0 & 0x1FF) == 0x1BC) ? "K28.5!" : "no-comma",
+               s1 & 0x1FF, ((s1 & 0x1FF) == 0x1BC) ? "K28.5!" : "no-comma");
+    thread_sleep_ms(1000);
+  }
+}
+
 
 // basic thread that just yields
 // some CPU heavy task that will spit out the result every few seconds or
@@ -89,6 +144,7 @@ THREAD_FUNCTION(compute_fn, arg) {
   }
 }
 
+#ifdef USE_DDR3
 void ddr3_pattern_test(void) {
   dbg_printf("\r\n=== DDR3 Pattern Test ===\r\n");
 
@@ -326,7 +382,9 @@ void ddr3_size_test(void) {
         dbg_printf("Start changed - memory aliases/wraps!\r\n");
     }
 }
+#endif
 
+#ifdef USE_AHB1
 void test_ahb1_rw(void) {
     dbg_printf("\r\n=== Testing AHB1 R/W ===\r\n");
 
@@ -423,6 +481,8 @@ void test_ahb1_16kb(void) {
 
     dbg_printf("=== AHB1 16KB test completed ===\r\n");
 }
+#endif // USE_AHB1
+
 /* ========================== MAIN ========================= */
 /* ========================================================= */
 /*
@@ -432,6 +492,7 @@ void test_ahb1_16kb(void) {
 int main(void) {
   hw_init();
 
+#ifdef USE_DDR3
   dbg_printf("DDR3 init\r\n");
   uint8_t status = DDR3_Init();
   dbg_printf("DDR3 init status: %d\r\n", status);
@@ -440,9 +501,11 @@ int main(void) {
   ddr3_rw_magic_test();
   ddr3_size_test();
   // ddr3_pattern_test();
-
+#endif
+#ifdef USE_AHB1
   test_ahb1_rw();
   test_ahb1_16kb();
+#endif
 
   // start the scheduler/kernel
   dbg_printf("initializing kernel...\r\n");
@@ -452,13 +515,14 @@ int main(void) {
 
   // idle thread with lowest priority
   mkthd_static(idle, idle_fn, sizeof(idle), PRIO_LOW, NULL);
-  mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
+  //mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
 
   mkthd_static(blink1_thd, blink1_fn, sizeof(blink1_thd), PRIO_NORMAL, NULL);
   mkthd_static(blink2_thd, blink2_fn, sizeof(blink2_thd), PRIO_NORMAL, NULL);
 
-  mkthd_static(fast_thd, fast_fn, sizeof(fast_thd), PRIO_LOW, NULL);
-  mkthd_static(compute_thd, compute_fn, sizeof(compute_thd), PRIO_LOW, NULL);
+  mkthd_static(sfp_thd, sfp_fn, sizeof(sfp_thd), PRIO_NORMAL, NULL);
+  //mkthd_static(fast_thd, fast_fn, sizeof(fast_thd), PRIO_LOW, NULL);
+  //mkthd_static(compute_thd, compute_fn, sizeof(compute_thd), PRIO_LOW, NULL);
 
 
   dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);

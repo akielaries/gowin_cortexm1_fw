@@ -11,6 +11,7 @@
 
 #include "sysinfo_regs.h"
 #include "gpio_regs.h"
+#include "sfp_regs.h"
 
 #include "GOWIN_M1.h"
 
@@ -20,7 +21,8 @@
 
 // HW access
 volatile struct sysinfo_regs *sysinfo = (struct sysinfo_regs *)APB_M1;
-volatile struct gpio_regs *gpio       = (struct gpio_regs *)(APB_M1 + 0x20);
+volatile struct gpio_regs    *gpio    = (struct gpio_regs    *)(APB_M1 + 0x20);
+volatile struct sfp_regs     *sfp     = (struct sfp_regs     *)(APB_M1 + 0x40);
 
 
 void sysinfo_get_mfg(const volatile struct sysinfo_regs *sysinfo,
