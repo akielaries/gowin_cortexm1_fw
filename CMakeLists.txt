@@ -29,7 +29,13 @@ set(LINKER_SCRIPT
 # Source files
 # --------------------------------------------------
 file(GLOB_RECURSE SOURCES
-    src/*.c
+    src/ethernet_demo.c
+    src/debug.c
+
+    src/hw.c
+    src/delay.c
+    src/gpio.c
+
     bsp/system/*.c
     bsp/drivers/src/*.c
     kernel/*.c

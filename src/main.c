@@ -12,8 +12,8 @@
 #include <stdint.h>
 
 
-#define USE_AHB1
-#define USE_DDR3
+//#define USE_AHB1
+//#define USE_DDR3
 
 #define GW5AST_138
 //#define GW5AT_60 1
@@ -73,6 +73,37 @@ THREAD_FUNCTION(fast_fn, arg) {
 
 THREAD_STACK(sfp_thd, 512);
 THREAD_FUNCTION(sfp_fn, arg) {
+  // ---- one-shot tx_pattern loopback demo ----
+  // Wait for both lanes to be ready before running the demo.
+  dbg_printf("[sfp] waiting for link...\r\n");
+  while (1) {
+    uint32_t s = sfp->stat;
+    uint32_t rdy0 = (s & SFP_REGS_STAT_LN0_READY_MASK) >> SFP_REGS_STAT_LN0_READY_SHIFT;
+    uint32_t rdy1 = (s & SFP_REGS_STAT_LN1_READY_MASK) >> SFP_REGS_STAT_LN1_READY_SHIFT;
+    if (rdy0 && rdy1) {
+      break;
+    }
+    thread_sleep_ms(200);
+  }
+
+  #define DEMO_PATTERN 0xDEADBEEF
+  dbg_printf("[sfp] link up...running tx_pattern demo (pattern=0x%08X)\r\n", DEMO_PATTERN);
+  sfp->tx_pattern = DEMO_PATTERN;
+  sfp->ctrl = SFP_REGS_CTRL_TX_MODE_MASK;   // tx_mode = 1
+  thread_sleep_ms(150);                        // let snap registers capture new data
+
+  uint32_t snap0 = sfp->ln0_rx_snap;
+  uint32_t snap1 = sfp->ln1_rx_snap;
+  dbg_printf("[sfp] snap: ln0=0x%08X  ln1=0x%08X  (expected 0x%08X)\r\n",
+             snap0, snap1, DEMO_PATTERN);
+  dbg_printf("[sfp] ln0 %s  ln1 %s\r\n",
+             (snap0 == DEMO_PATTERN) ? "PASS" : "FAIL",
+             (snap1 == DEMO_PATTERN) ? "PASS" : "FAIL");
+
+  sfp->ctrl = 0;   // restore tx_mode = 0 (PRBS7)
+  dbg_printf("[sfp] tx_mode restored to PRBS7\r\n");
+  // ---- end demo ----
+
   while (1) {
     uint32_t s  = sfp->stat;
     uint32_t s0 = sfp->ln0_rx_snap;
@@ -111,9 +142,12 @@ THREAD_FUNCTION(sfp_fn, arg) {
                ln1_sig, ln1_cdr, ln1_klock, ln1_align, ln1_pll, ln1_rdy, ln1_prbs,
                ln1_rxv, ln1_rxfe, ln1_txaf, ln1_txf);
     dbg_printf("  snap: ln0=0x%08X  ln1=0x%08X\r\n", s0, s1);
-    dbg_printf("    ln0[8:0]=0x%03X (%s)  ln1[8:0]=0x%03X (%s)\r\n",
-               s0 & 0x1FF, ((s0 & 0x1FF) == 0x1BC) ? "K28.5!" : "no-comma",
-               s1 & 0x1FF, ((s1 & 0x1FF) == 0x1BC) ? "K28.5!" : "no-comma");
+    if ((s0 & 0x1FF) == 0x1BC) {
+      dbg_printf("s0 K28.5!\r\n");
+    }
+    if ((s1 & 0x1FF) == 0x1BC) {
+      dbg_printf("s1 K28.5!\r\n");
+    }
     thread_sleep_ms(1000);
   }
 }
