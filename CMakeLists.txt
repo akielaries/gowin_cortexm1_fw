@@ -30,6 +30,7 @@ set(LINKER_SCRIPT
 # --------------------------------------------------
 file(GLOB_RECURSE SOURCES
     src/ethernet_demo.c
+    src/networking/*.c
     src/debug.c
 
     src/hw.c
@@ -64,6 +65,7 @@ add_executable(${PROJECT_NAME}.elf
 # --------------------------------------------------
 target_include_directories(${PROJECT_NAME}.elf PRIVATE
     src
+    src/networking
     bsp/core
     bsp/system
     bsp/drivers/inc

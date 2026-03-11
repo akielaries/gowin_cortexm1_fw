@@ -170,7 +170,38 @@ void CAN_Handler(void) {}
  * @param  none
  * @retval none
  */
-void ENT_Handler(void) {}
+/* weak stubs -- overridden by mac.c / phy.c when networking is linked */
+__attribute__((weak)) void mac_rx_isr(void)     {}
+__attribute__((weak)) void mac_tx_isr(void)     {}
+__attribute__((weak)) void phy_miim_rd_isr(void){}
+__attribute__((weak)) void phy_miim_wr_isr(void){}
+
+void ENT_Handler(void) {
+  /*
+  dbg_printf("ENT Handler rx_is=%02x tx_is=%02x miim_is=%02x\r\n",
+          Ethernet->ETH_RX_IS,
+          Ethernet->ETH_TX_IS,
+          Ethernet->MIIM_IS);
+  */
+  /* called by NVIC whenever the Ethernet peripheral asserts ENT_IRQn.
+   * multiple sources share this single interrupt line -- each ISR checks
+   * its own status bit and returns immediately if it wasn't the cause. */
+
+  /* frame arrived from the network: copies bytes out of MAC RX FIFO
+   * into mac_rx_buf and sets eth_rx_pending so mac_recv() can return it */
+  mac_rx_isr();
+
+  /* TX DMA finished: clears ETH_TX_IS so the MAC is ready to send again */
+  mac_tx_isr();
+
+  /* MIIM read complete: captures MIIM_RD_DATA into miim_rd_result,
+   * clears MIIM_IC, and sets miim_rd_done so phy_miim_read() can return */
+  phy_miim_rd_isr();
+
+  /* MIIM write complete: clears MIIM_IC and sets miim_wr_done
+   * so phy_miim_write() can return */
+  phy_miim_wr_isr();
+}
 
 /**
  * @brief  This function handles DualTimer interrupt request.

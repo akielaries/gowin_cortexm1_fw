@@ -1,6 +1,7 @@
 #include "GOWIN_M1_uart.h"
 #include "debug.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 
 // Helper function to print a number in hexadecimal
@@ -83,6 +84,34 @@ static void print_number(int n) {
         print_number(n / 10);
     }
     UART_SendChar(UART1, (n % 10) + '0');
+}
+
+/* 16 bytes per row: offset | hex bytes | ascii */
+void dbg_hexdump(const uint8_t *buf, uint32_t len) {
+    for (uint32_t i = 0; i < len; i += 16) {
+        print_hex(i, 4, false);
+        UART_SendChar(UART1, ' ');
+        UART_SendChar(UART1, ' ');
+        for (uint32_t j = 0; j < 16; j++) {
+            if (i + j < len) {
+                print_hex(buf[i + j], 2, false);
+            } else {
+                UART_SendChar(UART1, ' ');
+                UART_SendChar(UART1, ' ');
+            }
+            UART_SendChar(UART1, ' ');
+            if (j == 7) UART_SendChar(UART1, ' ');
+        }
+        UART_SendChar(UART1, ' ');
+        UART_SendChar(UART1, '|');
+        for (uint32_t j = 0; j < 16 && i + j < len; j++) {
+            uint8_t c = buf[i + j];
+            UART_SendChar(UART1, (c >= 0x20 && c < 0x7f) ? c : '.');
+        }
+        UART_SendChar(UART1, '|');
+        UART_SendChar(UART1, '\r');
+        UART_SendChar(UART1, '\n');
+    }
 }
 
 void dbg_printf(const char* format, ...) {
