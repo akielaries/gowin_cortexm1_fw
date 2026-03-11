@@ -24,12 +24,12 @@ void udp_send(const uint8_t *dst_mac,
   uint16_t udp_len  = 8 + payload_len;
   uint16_t ip_total = 20 + udp_len;
 
-  /* Layer 2: Ethernet header */
+  /* eth frame header */
   memcpy(&tx_buf[ETH_DST], dst_mac, 6);
   memcpy(&tx_buf[ETH_SRC], my_mac, 6);
   wr16(&tx_buf[ETH_TYPE], ETHERTYPE_IPV4);
 
-  /* Layer 3: IPv4 header */
+  /* IPv4 header using the static IP defined by the app (main) */
   tx_buf[IP_BASE + 0] = 0x45; /* version=4, IHL=5 (20 bytes, no options) */
   tx_buf[IP_BASE + 1] = 0x00; /* DSCP/ECN = default                      */
   wr16(&tx_buf[IP_LEN], ip_total);
@@ -42,13 +42,13 @@ void udp_send(const uint8_t *dst_mac,
   memcpy(&tx_buf[IP_DST], dst_ip, 4);
   wr16(&tx_buf[IP_CSUM], inet_checksum(&tx_buf[IP_BASE], 20));
 
-  /* Layer 4: UDP header */
+  /* UDP header */
   wr16(&tx_buf[UDP_SRC], src_port);
   wr16(&tx_buf[UDP_DST], dst_port);
   wr16(&tx_buf[UDP_LEN], udp_len);
   wr16(&tx_buf[UDP_CSUM], 0); /* checksum omitted (RFC 768 allows this)   */
 
-  /* Payload — visible at byte 42 in Wireshark's hex pane */
+  /* payload */
   memcpy(&tx_buf[UDP_DATA], payload, payload_len);
 
   mac_send(14 + ip_total);

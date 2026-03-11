@@ -50,6 +50,114 @@ static const uint8_t DST_IP[4] = {192, 168, 86, 114};
 #define PHY_ADDR 1
 
 /* =============================================================================
+ * AMBIENT TRAFFIC DECODER
+ * #define DEBUG_DECODE_AMBIENT to enable verbose decoding of all received frames
+ * =============================================================================
+ */
+#define DEBUG_DECODE_AMBIENT
+
+#ifdef DEBUG_DECODE_AMBIENT
+static void print_mac4(const uint8_t *m) {
+  dbg_printf("%02x:%02x:%02x:%02x:%02x:%02x",
+             m[0], m[1], m[2], m[3], m[4], m[5]);
+}
+
+static void print_ip4(const uint8_t *ip) {
+  dbg_printf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+}
+
+static const char *port_name(uint16_t p) {
+  switch (p) {
+    case 53:   return "DNS";
+    case 67:   return "DHCP-srv";
+    case 68:   return "DHCP-cli";
+    case 123:  return "NTP";
+    case 443:  return "HTTPS";
+    case 1900: return "SSDP";
+    case 5353: return "mDNS";
+    case 5355: return "LLMNR";
+    case 9999: return "our-port";
+    default:   return NULL;
+  }
+}
+
+static void print_port(uint16_t p) {
+  const char *n = port_name(p);
+  if (n) { dbg_printf("%d(%s)", p, n); }
+  else   { dbg_printf("%d", p); }
+}
+
+static void decode_frame(const uint8_t *buf, uint32_t len) {
+  if (len < 14) { return; }
+  uint16_t etype = rd16(&buf[ETH_TYPE]);
+
+  if (etype == ETHERTYPE_ARP && len >= ARP_FRAME_LEN) {
+    uint16_t op = rd16(&buf[ARP_OPER]);
+    const char *opstr = (op == 1) ? "request" : (op == 2) ? "reply" : "?";
+    dbg_printf("  ARP %s  ", opstr);
+    print_mac4(&buf[ARP_SHA]);
+    dbg_printf("  ");
+    print_ip4(&buf[ARP_SPA]);
+    dbg_printf(" -> ");
+    print_ip4(&buf[ARP_TPA]);
+    dbg_printf("\r\n");
+    return;
+  }
+
+  if (etype == ETHERTYPE_IPV4 && len >= (uint32_t)(IP_BASE + 20)) {
+    uint8_t proto = buf[IP_PROTO];
+    dbg_printf("  IPv4 ");
+    print_ip4(&buf[IP_SRC]);
+    dbg_printf(" -> ");
+    print_ip4(&buf[IP_DST]);
+    dbg_printf("  ");
+
+    if (proto == IP_PROTO_ICMP && len >= (uint32_t)(ICMP_BASE + 1)) {
+      uint8_t t = buf[ICMP_TYPE];
+      const char *tn = (t == 0) ? "echo-reply" : (t == 8) ? "echo-req" : "?";
+      dbg_printf("ICMP %s\r\n", tn);
+    } else if (proto == IP_PROTO_UDP && len >= (uint32_t)(UDP_BASE + 4)) {
+      dbg_printf("UDP ");
+      print_port(rd16(&buf[UDP_SRC]));
+      dbg_printf(" -> ");
+      print_port(rd16(&buf[UDP_DST]));
+      dbg_printf("  len=%d\r\n", rd16(&buf[UDP_LEN]) - 8);
+    } else if (proto == IP_PROTO_TCP && len >= (uint32_t)(IP_BASE + 20 + 14)) {
+      uint16_t sp    = rd16(&buf[IP_BASE + 20]);
+      uint16_t dp    = rd16(&buf[IP_BASE + 22]);
+      uint8_t  flags = buf[IP_BASE + 20 + 13];
+      dbg_printf("TCP ");
+      print_port(sp);
+      dbg_printf(" -> ");
+      print_port(dp);
+      dbg_printf("  [%s%s%s%s%s]\r\n",
+          (flags & 0x02) ? "SYN " : "",
+          (flags & 0x10) ? "ACK " : "",
+          (flags & 0x08) ? "PSH " : "",
+          (flags & 0x01) ? "FIN " : "",
+          (flags & 0x04) ? "RST " : "");
+    } else {
+      dbg_printf("proto=0x%02x\r\n", proto);
+    }
+    return;
+  }
+
+  if (etype == 0x86DD && len >= (uint32_t)(14 + 40)) {
+    /* IPv6 fixed header: next-header at offset 6, src at 8, dst at 24 */
+    uint8_t nh = buf[14 + 6];
+    const char *nhstr = (nh == 0x3a) ? "ICMPv6" :
+                        (nh == 0x11) ? "UDP"    :
+                        (nh == 0x06) ? "TCP"    : "?";
+    dbg_printf("  IPv6 [%02x%02x:%02x%02x:...] -> [%02x%02x:%02x%02x:...]"
+               "  nh=%s\r\n",
+               buf[22], buf[23], buf[24], buf[25],
+               buf[38], buf[39], buf[40], buf[41],
+               nhstr);
+  }
+}
+#endif /* DEBUG_DECODE_AMBIENT */
+
+/* =============================================================================
  * RECEIVE DISPATCH — what to do with incoming frames
  *
  * Add cases here to handle new protocols.  The networking/ library gives you:
@@ -78,8 +186,22 @@ static void dispatch(const uint8_t *buf, uint32_t len) {
         break;
 
       if (buf[IP_PROTO] == IP_PROTO_ICMP && len >= (uint32_t)(ICMP_BASE + 8) &&
-          buf[ICMP_TYPE] == ICMP_ECHO_REQUEST)
+          buf[ICMP_TYPE] == ICMP_ECHO_REQUEST) {
         icmp_echo_reply(buf, len);
+        break;
+      }
+
+      if (buf[IP_PROTO] == IP_PROTO_UDP && len >= (uint32_t)(UDP_DATA)) {
+        uint16_t dst_port = rd16(&buf[UDP_DST]);
+        uint16_t src_port = rd16(&buf[UDP_SRC]);
+        uint16_t data_len = rd16(&buf[UDP_LEN]) - 8;
+        if (dst_port == DEBUG_UDP_PORT) {
+          dbg_printf("udp: rx port=%d len=%d\r\n", dst_port, data_len);
+          udp_send(&buf[ETH_SRC], &buf[IP_SRC],
+                   dst_port, src_port,
+                   &buf[UDP_DATA], data_len);
+        }
+      }
       break;
   }
 }
@@ -135,7 +257,7 @@ THREAD_FUNCTION(eth_fn, arg) {
            sizeof(debug_pkt));
 
   uint32_t frame_len = 14 + 20 + 8 + sizeof(debug_pkt);
-  uint8_t DBG_TRIES = 1;
+  uint8_t DBG_TRIES = 3;
   for (int rep = 0; rep < DBG_TRIES; rep++) {
       // ethernet framing?
       dbg_printf("--- tx frame %d (%u bytes) ---\r\n", rep, frame_len);
@@ -170,7 +292,15 @@ THREAD_FUNCTION(eth_fn, arg) {
   while (1) {
     uint32_t len = mac_recv(rx_buf);
     if (len > 0) {
-      dbg_printf("rx: len=%d etype=0x%04x\r\n", len, rd16(&rx_buf[ETH_TYPE]));
+      uint16_t et = rd16(&rx_buf[ETH_TYPE]);
+      const char *name =
+          (et == ETHERTYPE_ARP)  ? "ARP"  :
+          (et == ETHERTYPE_IPV4) ? "IPv4" :
+          (et == 0x86DD)         ? "IPv6" : "?";
+      dbg_printf("rx: len=%d etype=0x%04x (%s)\r\n", len, et, name);
+#ifdef DEBUG_DECODE_AMBIENT
+      decode_frame(rx_buf, len);
+#endif
       dispatch(rx_buf, len);
     }
 

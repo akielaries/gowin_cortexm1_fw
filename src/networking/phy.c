@@ -83,6 +83,13 @@ static void print_physpcs(uint16_t physpcs) {
 void phy_init(uint8_t phy_addr) {
   /* RTL8211FI needs ~72ms after EPHY_RST_N deasserts before MDIO responds */
   thread_sleep_ms(200);
+
+  /* force autoneg restart so BMCR always has AN enabled.
+   * a previous run may have written BMCR_FORCE_100FD which disables autoneg
+   * (clears bit 12); without this, BMSR_AN_COMPLETE never asserts. */
+  phy_miim_write(phy_addr, PHY_REG_BMCR, BMCR_AUTONEG_EN | BMCR_RESTART_AN);
+  thread_sleep_ms(100);
+
   dbg_printf("phy: waiting for link...\r\n");
 
   /* read twice -- first read clears any latched edge bits */
@@ -103,6 +110,14 @@ void phy_init(uint8_t phy_addr) {
       continue;
     }
 
+    /* wait for autoneg to finish before reading the speed result.
+     * BMSR_AN_COMPLETE latches high once autoneg settles; without this
+     * we can read PHYSPCS while it still shows the previous value. */
+    if (!(bmsr & BMSR_AN_COMPLETE)) {
+      thread_sleep_ms(100);
+      continue;
+    }
+
     /* enable RTL8211FI internal RGMII RX delay (~2ns) via paged MDIO.
      * this shifts RXC so RXD is center-aligned at the FPGA input,
      * giving the MAC a clean setup/hold window at 1G (125MHz DDR). */
@@ -114,12 +129,8 @@ void phy_init(uint8_t phy_addr) {
     dbg_printf("phy: RTL_REG_RXDLY after =0x%04x\r\n", rxdly);
     phy_miim_write(phy_addr, 31, 0);
 
-    /* force 1G FD unconditionally -- bypass autoneg result */
-    dbg_printf("phy: forcing 1G FD via BMCR\r\n");
-    phy_miim_write(phy_addr, PHY_REG_BMCR, BMCR_FORCE_1GFD);
-    thread_sleep_ms(500);
-
-    /* re-read PHYSPCS after force to confirm what speed the PHY settled on */
+    /* read autoneg result -- no BMCR force, let PHY stay at whatever it settled.
+     * forcing via BMCR restarts the link which may affect RGMII_RXC timing. */
     uint16_t physpcs = phy_miim_read(phy_addr, RTL_REG_PHYSPCS);
     print_physpcs(physpcs);
 
