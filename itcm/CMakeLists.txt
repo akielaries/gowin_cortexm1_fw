@@ -24,14 +24,22 @@ file(GLOB STARTUP_SOURCES
     ${CMAKE_SOURCE_DIR}/bsp/startup/*.S
 )
 
+if(BOARD_VARIANT)
+  set(TARGET_SUFFIX "_${BOARD_VARIANT}")
+else()
+  set(TARGET_SUFFIX "")
+endif()
+
+set(ITCM_ELF_TARGET "itcm${TARGET_SUFFIX}.elf")
+
 # Define the itcm executable
-add_executable(itcm.elf
+add_executable(${ITCM_ELF_TARGET}
     ${STARTUP_SOURCES}
     ${BOOTLOADER_SOURCES}
 )
 
 # Include directories for the itcm
-target_include_directories(itcm.elf PRIVATE
+target_include_directories(${ITCM_ELF_TARGET} PRIVATE
     ${CMAKE_SOURCE_DIR}/kernel
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/bsp/core
@@ -41,7 +49,7 @@ target_include_directories(itcm.elf PRIVATE
 )
 
 # CPU + Compile options (same as main project)
-target_compile_options(itcm.elf PRIVATE
+target_compile_options(${ITCM_ELF_TARGET} PRIVATE
     -mcpu=cortex-m1
     -mthumb
 
@@ -62,26 +70,26 @@ target_compile_options(itcm.elf PRIVATE
 )
 
 # Linker options (same as main project)
-target_link_options(itcm.elf PRIVATE
+target_link_options(${ITCM_ELF_TARGET} PRIVATE
     -mcpu=cortex-m1
     -mthumb
 
     -T ${LINKER_SCRIPT}
 
     -Wl,--gc-sections
-    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/itcm.map
+    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/itcm${TARGET_SUFFIX}.map
 )
 
 # Post-build: generate .bin
-add_custom_command(TARGET itcm.elf POST_BUILD
+add_custom_command(TARGET ${ITCM_ELF_TARGET} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY}
             -O binary
-            $<TARGET_FILE:itcm.elf>
-            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/itcm.bin
+            $<TARGET_FILE:${ITCM_ELF_TARGET}>
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/itcm${TARGET_SUFFIX}.bin
 )
 
 # Post-build: print size
-add_custom_command(TARGET itcm.elf POST_BUILD
+add_custom_command(TARGET ${ITCM_ELF_TARGET} POST_BUILD
     COMMAND ${CMAKE_SOURCE_DIR}/scripts/size_summary.sh
-            $<TARGET_FILE:itcm.elf>
+            $<TARGET_FILE:${ITCM_ELF_TARGET}>
 )

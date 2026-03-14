@@ -1,10 +1,4 @@
 /*
- * ethernet_demo.c — application layer for the Tang Mega 138K ethernet demo
- *
- * This is the only file you need to modify to change how the device behaves
- * on the network.  The networking/ directory underneath is a reusable library
- * — it has no hardcoded addresses or application logic.
- *
  * What this demo does:
  *   - Comes up as 192.168.86.200 / 02:12:34:56:78:9A
  *   - Responds to ARP and ping
@@ -28,24 +22,29 @@
 
 
 /* =============================================================================
- * APPLICATION CONFIGURATION — edit these for your deployment
+ * APPLICATION CONFIGURATION 
  * =============================================================================
  */
 
 
-/* Who we are */
+// just because I have a mega60k and mega138k hooked up to my switch at home
+#ifdef MEGA_138K
 static const uint8_t MY_MAC[6] = {0x02, 0x12, 0x34, 0x56, 0x78, 0x9A};
 static const uint8_t MY_IP[4]  = {192, 168, 86, 200};
+#endif
+#ifdef MEGA_60K
+static const uint8_t MY_MAC[6] = {0x02, 0x13, 0x35, 0x57, 0x79, 0x9B};
+static const uint8_t MY_IP[4]  = {192, 168, 86, 201};
+#endif
 
 /* Where to send outgoing debug UDP packets.
  * Run `ip link show` on your laptop to find the right MAC. */
 static const uint8_t DST_MAC[6] =
   {0x04, 0x68, 0x74, 0x29, 0x4a, 0x35}; /* wlp1s0 */
 static const uint8_t DST_IP[4] = {192, 168, 86, 114};
-#define DEBUG_UDP_PORT                                                         \
-  9999 /* Wireshark: udp.port == 9999  |  nc -lu 9999 | xxd */
+#define DEBUG_UDP_PORT 9999
 
-/* PHY bus address — set by strap pins on the board, see schematic (3'b001 = 1)
+/* PHY bus address set by strap pins on the board, see schematic (3'b001 = 1)
  */
 #define PHY_ADDR 1
 
@@ -54,7 +53,7 @@ static const uint8_t DST_IP[4] = {192, 168, 86, 114};
  * #define DEBUG_DECODE_AMBIENT to enable verbose decoding of all received frames
  * =============================================================================
  */
-#define DEBUG_DECODE_AMBIENT
+//#define DEBUG_DECODE_AMBIENT
 
 #ifdef DEBUG_DECODE_AMBIENT
 static void print_mac4(const uint8_t *m) {
@@ -158,15 +157,14 @@ static void decode_frame(const uint8_t *buf, uint32_t len) {
 #endif /* DEBUG_DECODE_AMBIENT */
 
 /* =============================================================================
- * RECEIVE DISPATCH — what to do with incoming frames
+ * RECEIVE DISPATCH .... what to do with incoming frames
  *
  * Add cases here to handle new protocols.  The networking/ library gives you:
- *   arp_reply(buf)              — send an ARP reply to whoever asked
- *   icmp_echo_reply(buf, len)   — send a ping reply
- *   udp_send(...)               — send a UDP datagram
+ *   arp_reply(buf)              -send an ARP reply to whoever asked
+ *   icmp_echo_reply(buf, len)   - send a ping reply
+ *   udp_send(...)               - send a UDP datagram
  * =============================================================================
  */
-
 static void dispatch(const uint8_t *buf, uint32_t len) {
   if (len < 14)
     return;
@@ -223,10 +221,14 @@ static void build_debug_pkt(void) {
   debug_pkt[1] = 0xAD;
   debug_pkt[2] = 0xBE;
   debug_pkt[3] = 0xEF;
-  for (int i = 0; i < 128; i++)
+  // ramp
+  for (int i = 0; i < 128; i++) {
     debug_pkt[4 + i] = (uint8_t)i;
+  }
 }
 
+// almighty ethernet thread! the while loop here is the RX of MAC frames that we then
+// decode and can 
 THREAD_STACK(eth_thd, 1024);
 THREAD_FUNCTION(eth_fn, arg) {
   mac_set_identity(MY_MAC, MY_IP);
@@ -322,10 +324,19 @@ THREAD_FUNCTION(idle_fn, arg) {
 
 int main(void) {
   hw_init();
+#ifdef MEGA_60K
+  dbg_printf("FPGA == MEGA_60K\r\n");
+#endif
+#ifdef MEGA_138K
+  dbg_printf("FPGA == MEGA_138K\r\n");
+#endif
+
   kernel_init();
+
   mkthd_static(eth_thd, eth_fn, sizeof(eth_thd), PRIO_NORMAL, NULL);
   mkthd_static(idle_thd, idle_fn, sizeof(idle_thd), PRIO_LOW, NULL);
   kernel_start();
+
   while (1) {
     __WFI();
   }

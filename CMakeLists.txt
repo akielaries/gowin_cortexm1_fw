@@ -12,6 +12,19 @@ set(CMAKE_OBJCOPY arm-none-eabi-objcopy)
 set(CMAKE_SIZE arm-none-eabi-size)
 
 # --------------------------------------------------
+# Board variant
+# --------------------------------------------------
+set(BOARD_VARIANT "" CACHE STRING "Board variant: MEGA_138K or MEGA_60K")
+if(BOARD_VARIANT)
+  add_compile_definitions(${BOARD_VARIANT})
+  set(TARGET_SUFFIX "_${BOARD_VARIANT}")
+else()
+  set(TARGET_SUFFIX "")
+endif()
+
+set(ELF_TARGET "${PROJECT_NAME}${TARGET_SUFFIX}.elf")
+
+# --------------------------------------------------
 # Output directories
 # --------------------------------------------------
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -29,7 +42,9 @@ set(LINKER_SCRIPT
 # Source files
 # --------------------------------------------------
 file(GLOB_RECURSE SOURCES
-    src/ethernet_demo.c
+    #src/ethernet_demo.c
+    #src/sfp_demo.c
+    src/gpio_ffc_demo.c
     src/networking/*.c
     src/debug.c
 
@@ -55,7 +70,7 @@ add_subdirectory(itcm)
 # --------------------------------------------------
 # Executable
 # --------------------------------------------------
-add_executable(${PROJECT_NAME}.elf
+add_executable(${ELF_TARGET}
     ${STARTUP_SOURCES}
     ${SOURCES}
 )
@@ -63,7 +78,7 @@ add_executable(${PROJECT_NAME}.elf
 # --------------------------------------------------
 # Include directories
 # --------------------------------------------------
-target_include_directories(${PROJECT_NAME}.elf PRIVATE
+target_include_directories(${ELF_TARGET} PRIVATE
     src
     src/networking
     bsp/core
@@ -77,7 +92,7 @@ target_include_directories(${PROJECT_NAME}.elf PRIVATE
 # --------------------------------------------------
 # CPU + Compile options
 # --------------------------------------------------
-target_compile_options(${PROJECT_NAME}.elf PRIVATE
+target_compile_options(${ELF_TARGET} PRIVATE
     -mcpu=cortex-m1
     -mthumb
 
@@ -100,30 +115,30 @@ target_compile_options(${PROJECT_NAME}.elf PRIVATE
 # --------------------------------------------------
 # Linker options
 # --------------------------------------------------
-target_link_options(${PROJECT_NAME}.elf PRIVATE
+target_link_options(${ELF_TARGET} PRIVATE
     -mcpu=cortex-m1
     -mthumb
 
     -T ${LINKER_SCRIPT}
 
     -Wl,--gc-sections
-    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}.map
+    -Wl,-Map=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}${TARGET_SUFFIX}.map
 )
 
 # --------------------------------------------------
 # Post-build: generate .bin
 # --------------------------------------------------
-add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
+add_custom_command(TARGET ${ELF_TARGET} POST_BUILD
     COMMAND arm-none-eabi-objcopy
             -O binary
-            $<TARGET_FILE:${PROJECT_NAME}.elf>
-            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}.bin
+            $<TARGET_FILE:${ELF_TARGET}>
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_NAME}${TARGET_SUFFIX}.bin
 )
 
 # --------------------------------------------------
 # Post-build: print size
 # --------------------------------------------------
-add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
+add_custom_command(TARGET ${ELF_TARGET} POST_BUILD
     COMMAND ${CMAKE_SOURCE_DIR}/scripts/size_summary.sh
-            $<TARGET_FILE:${PROJECT_NAME}.elf>
+            $<TARGET_FILE:${ELF_TARGET}>
 )
