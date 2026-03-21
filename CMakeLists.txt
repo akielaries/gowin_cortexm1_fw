@@ -42,9 +42,9 @@ set(LINKER_SCRIPT
 # Source files
 # --------------------------------------------------
 file(GLOB_RECURSE SOURCES
-    #src/ethernet_demo.c
+    src/ethernet_demo.c
     #src/sfp_demo.c
-    src/gpio_ffc_demo.c
+    #src/gpio_ffc_demo.c
     src/networking/*.c
     src/debug.c
 

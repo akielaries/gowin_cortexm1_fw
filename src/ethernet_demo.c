@@ -157,6 +157,39 @@ static void decode_frame(const uint8_t *buf, uint32_t len) {
 #endif /* DEBUG_DECODE_AMBIENT */
 
 /* =============================================================================
+ * MAGIC PAYLOAD DETECTOR
+ *
+ * Checks the first 4 bytes of a UDP payload against known magic words and
+ * prints a message when one matches.  Add new entries to the table below.
+ * =============================================================================
+ */
+struct magic_entry {
+  uint8_t     bytes[4];
+  const char *name;
+};
+
+static const struct magic_entry magic_table[] = {
+  { {0xca, 0xfe, 0xba, 0xbe}, "CAFEBABE" },
+  { {0xde, 0xad, 0xbe, 0xef}, "DEADBEEF" },
+  { {0xde, 0xad, 0xc0, 0xde}, "DEADCODE" },
+  { {0xfe, 0xed, 0xfa, 0xce}, "FEEDFACE" },
+};
+
+#define MAGIC_TABLE_LEN (sizeof(magic_table) / sizeof(magic_table[0]))
+
+static void check_magic_payload(const uint8_t *data, uint16_t len) {
+  if (len < 4) {
+    return;
+  }
+  for (uint32_t i = 0; i < MAGIC_TABLE_LEN; i++) {
+    if (memcmp(data, magic_table[i].bytes, 4) == 0) {
+      dbg_printf("magic: got %s!\r\n", magic_table[i].name);
+      return;
+    }
+  }
+}
+
+/* =============================================================================
  * RECEIVE DISPATCH .... what to do with incoming frames
  *
  * Add cases here to handle new protocols.  The networking/ library gives you:
@@ -195,6 +228,7 @@ static void dispatch(const uint8_t *buf, uint32_t len) {
         uint16_t data_len = rd16(&buf[UDP_LEN]) - 8;
         if (dst_port == DEBUG_UDP_PORT) {
           dbg_printf("udp: rx port=%d len=%d\r\n", dst_port, data_len);
+          check_magic_payload(&buf[UDP_DATA], data_len);
           udp_send(&buf[ETH_SRC], &buf[IP_SRC],
                    dst_port, src_port,
                    &buf[UDP_DATA], data_len);

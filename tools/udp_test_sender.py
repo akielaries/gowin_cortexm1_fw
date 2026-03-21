@@ -19,7 +19,11 @@ def main():
     )
     args = parser.parse_args()
 
-    payload = args.message.encode()
+    msg = args.message
+    if msg.startswith("0x") or msg.startswith("0X"):
+        payload = bytes.fromhex(msg[2:])
+    else:
+        payload = msg.encode()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(args.timeout)
