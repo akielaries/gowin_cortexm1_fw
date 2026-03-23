@@ -41,7 +41,7 @@ THREAD_STACK(blink1_thd, 512);
 THREAD_FUNCTION(blink1_fn, arg) {
   while (1) {
     //dbg_printf("pin0\r\n");
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
+    gpio_toggle(GPIO0, GPIO_Pin_0);
     thread_sleep_ms(500);
   }
 }
@@ -50,7 +50,7 @@ THREAD_STACK(blink2_thd, 512);
 THREAD_FUNCTION(blink2_fn, arg) {
   while (1) {
     //dbg_printf("pin1\r\n");
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
+    gpio_toggle(GPIO0, GPIO_Pin_1);
     thread_sleep_ms(1000);
   }
 }
@@ -58,7 +58,7 @@ THREAD_FUNCTION(blink2_fn, arg) {
 THREAD_STACK(fast_thd, 256);
 THREAD_FUNCTION(fast_fn, arg) {
   while (1) {
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_2);
+    gpio_toggle(GPIO0, GPIO_Pin_2);
     // thread_sleep_ms(2);
   }
 }
@@ -68,15 +68,15 @@ THREAD_STACK(gpio_toggler_thd, 512);
 THREAD_FUNCTION(gpio_toggler_fn, arg) {
   while (1) {
     dbg_printf("gpio toggled\r\n");
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_3);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_4);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_5);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_6);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_7);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_8);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_9);
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_10);
-    thread_sleep_ms(500);
+    gpio_toggle(GPIO0, GPIO_Pin_3);
+    gpio_toggle(GPIO0, GPIO_Pin_4);
+    gpio_toggle(GPIO0, GPIO_Pin_5);
+    gpio_toggle(GPIO0, GPIO_Pin_6);
+    gpio_toggle(GPIO0, GPIO_Pin_7);
+    gpio_toggle(GPIO0, GPIO_Pin_8);
+    gpio_toggle(GPIO0, GPIO_Pin_9);
+    gpio_toggle(GPIO0, GPIO_Pin_10);
+    thread_sleep_ms(2000);
   }
 }
 #endif
@@ -85,13 +85,16 @@ THREAD_FUNCTION(gpio_toggler_fn, arg) {
 THREAD_STACK(gpio_status_thd, 512);
 THREAD_FUNCTION(gpio_status_fn, arg) {
   while (1) {
-    uint32_t pins = GPIO_ReadBits(GPIO0);
-    dbg_printf("ffc gpio [3-10]:");
-    for (uint8_t i = 3; i <= 10; i++) {
-      dbg_printf(" p%d=%d", i, (pins >> i) & 1);
-    }
-    dbg_printf("\r\n");
-    thread_sleep_ms(500);
+    dbg_printf("p3=%d p4=%d p5=%d p6=%d p7=%d p8=%d p9=%d p10=%d\r\n",
+      gpio_read(GPIO0, GPIO_Pin_3),
+      gpio_read(GPIO0, GPIO_Pin_4),
+      gpio_read(GPIO0, GPIO_Pin_5),
+      gpio_read(GPIO0, GPIO_Pin_6),
+      gpio_read(GPIO0, GPIO_Pin_7),
+      gpio_read(GPIO0, GPIO_Pin_8),
+      gpio_read(GPIO0, GPIO_Pin_9),
+      gpio_read(GPIO0, GPIO_Pin_10));
+    thread_sleep_ms(200);
   }
 }
 #endif
@@ -147,7 +150,7 @@ int main(void) {
 
   // idle thread with lowest priority
   mkthd_static(idle, idle_fn, sizeof(idle), PRIO_LOW, NULL);
-  mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
+  //mkthd_static(uptime, uptime_fn, sizeof(uptime), PRIO_NORMAL, NULL);
 
   mkthd_static(blink1_thd, blink1_fn, sizeof(blink1_thd), PRIO_NORMAL, NULL);
   mkthd_static(blink2_thd, blink2_fn, sizeof(blink2_thd), PRIO_NORMAL, NULL);

@@ -11,25 +11,14 @@
 #include <stdint.h>
 #include "GOWIN_M1.h"
 
-// Define pin states for clarity
 typedef enum {
-    PIN_STATE_LOW = 0,
-    PIN_STATE_HIGH = 1
-} Pin_State_t;
+  PIN_LOW  = 0,
+  PIN_HIGH = 1
+} pin_state_e;
 
-// Structure to map a board pin number to a GPIO port and pin mask
-typedef struct {
-    uint8_t board_pin_number;
-    GPIO_TypeDef* port;
-    uint32_t pin_mask;
-} Board_Pin_Map_t;
-
-void gpio_init(void);
-
-void GPIO_ToggleBit(GPIO_TypeDef* GPIOx, uint32_t GPIO_Pin);
-
-void Board_Pin_Write(uint8_t board_pin_number, Pin_State_t state);
-void Board_Pin_Toggle(uint8_t board_pin_number);
-
+void         gpio_init(void);
+void         gpio_toggle(GPIO_TypeDef *port, uint32_t pin);
+void         gpio_write(GPIO_TypeDef *port, uint32_t pin, pin_state_e state);
+pin_state_e  gpio_read(GPIO_TypeDef *port, uint32_t pin);
 
 #endif /* GPIO_H_ */

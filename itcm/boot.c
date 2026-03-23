@@ -35,7 +35,7 @@ THREAD_FUNCTION(uptime_fn, arg) {
 THREAD_STACK(blink1_thd, 512);
 THREAD_FUNCTION(blink1_fn, arg) {
   while (1) {
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
+    gpio_toggle(GPIO0, GPIO_Pin_0);
     thread_sleep_ms(500);
   }
 }
@@ -43,7 +43,7 @@ THREAD_FUNCTION(blink1_fn, arg) {
 THREAD_STACK(blink2_thd, 512);
 THREAD_FUNCTION(blink2_fn, arg) {
   while (1) {
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
+    gpio_toggle(GPIO0, GPIO_Pin_1);
     thread_sleep_ms(1000);
   }
 }

@@ -45,11 +45,22 @@ void gpio_init(void) {
 */
 }
 
-void GPIO_ToggleBit(GPIO_TypeDef* GPIOx, uint32_t GPIO_Pin) {
-  if (GPIOx->DATAOUT & GPIO_Pin) {
-    GPIOx->DATAOUT &= ~GPIO_Pin;
+void gpio_toggle(GPIO_TypeDef *port, uint32_t pin) {
+  if (port->DATAOUT & pin) {
+    port->DATAOUT &= ~pin;
+  } else {
+    port->DATAOUT |= pin;
   }
-  else {
-    GPIOx->DATAOUT |= GPIO_Pin;
+}
+
+void gpio_write(GPIO_TypeDef *port, uint32_t pin, pin_state_e state) {
+  if (state == PIN_HIGH) {
+    port->DATAOUT |= pin;
+  } else {
+    port->DATAOUT &= ~pin;
   }
+}
+
+pin_state_e gpio_read(GPIO_TypeDef *port, uint32_t pin) {
+  return (port->DATA & pin) ? PIN_HIGH : PIN_LOW;
 }

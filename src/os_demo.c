@@ -41,7 +41,7 @@ THREAD_STACK(blink1_thd, 512);
 THREAD_FUNCTION(blink1_fn, arg) {
   while (1) {
     //dbg_printf("pin0\r\n");
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_0);
+    gpio_toggle(GPIO0, GPIO_Pin_0);
     thread_sleep_ms(500);
   }
 }
@@ -50,7 +50,7 @@ THREAD_STACK(blink2_thd, 512);
 THREAD_FUNCTION(blink2_fn, arg) {
   while (1) {
     //dbg_printf("pin1\r\n");
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_1);
+    gpio_toggle(GPIO0, GPIO_Pin_1);
     thread_sleep_ms(1000);
   }
 }
@@ -58,7 +58,7 @@ THREAD_FUNCTION(blink2_fn, arg) {
 THREAD_STACK(fast_thd, 256);
 THREAD_FUNCTION(fast_fn, arg) {
   while (1) {
-    GPIO_ToggleBit(GPIO0, GPIO_Pin_2);
+    gpio_toggle(GPIO0, GPIO_Pin_2);
     // thread_sleep_ms(2);
   }
 }

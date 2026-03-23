@@ -42,20 +42,20 @@ set(LINKER_SCRIPT
 # Source files
 # --------------------------------------------------
 file(GLOB_RECURSE SOURCES
-    src/ethernet_demo.c
-    #src/sfp_demo.c
-    #src/gpio_ffc_demo.c
-    src/networking/*.c
-    src/debug.c
+  #src/ethernet_demo.c
+  #src/sfp_demo.c
+  src/gpio_ffc_demo.c
+  src/networking/*.c
+  src/debug.c
 
-    src/hw.c
-    src/delay.c
-    src/gpio.c
+  src/hw.c
+  src/delay.c
+  src/gpio.c
 
-    bsp/system/*.c
-    bsp/drivers/src/*.c
-    kernel/*.c
-    kernel/pendsv.S
+  bsp/system/*.c
+  bsp/drivers/src/*.c
+  kernel/*.c
+  kernel/pendsv.S
 )
 
 file(GLOB STARTUP_SOURCES
