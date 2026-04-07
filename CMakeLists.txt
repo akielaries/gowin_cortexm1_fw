@@ -44,9 +44,12 @@ set(LINKER_SCRIPT
 file(GLOB_RECURSE SOURCES
   #src/ethernet_demo.c
   #src/sfp_demo.c
-  src/gpio_ffc_demo.c
+  #src/gpio_ffc_demo.c
+  src/multiflex_demo.c
   src/networking/*.c
   src/debug.c
+
+  src/multiflex/mfx.c
 
   src/hw.c
   src/delay.c
@@ -81,6 +84,7 @@ add_executable(${ELF_TARGET}
 target_include_directories(${ELF_TARGET} PRIVATE
     src
     src/networking
+    src/multiflex
     bsp/core
     bsp/system
     bsp/drivers/inc

@@ -11,13 +11,8 @@ void gpio_init(void) {
   GPIO_Init(GPIO0, &GPIO_InitType);
 
 #ifdef MEGA_60K
-  // pins 3-10 are FFC outputs on the 60k side
-  GPIO_InitType.GPIO_Pin = GPIO_Pin_3  | GPIO_Pin_4  | GPIO_Pin_5  |
-                           GPIO_Pin_6  | GPIO_Pin_7  | GPIO_Pin_8  |
-                           GPIO_Pin_9  | GPIO_Pin_10;
-  GPIO_InitType.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_InitType.GPIO_Int = GPIO_Int_Disable;
-  GPIO_Init(GPIO0, &GPIO_InitType);
+  // multiflex tx, rx, sync, clk are dedicated top-level rtl ports
+  // gpio 4-10 are no longer used by firmware
 #endif
 
 #ifdef MEGA_138K

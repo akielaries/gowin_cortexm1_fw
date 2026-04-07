@@ -2,6 +2,8 @@
 
 #include "kernel.h"
 #include "debug.h"
+
+#include "mfx.h"
 #include "gpio.h"
 #include "delay.h"
 #include "sys_defs.h"
@@ -63,6 +65,17 @@ THREAD_FUNCTION(fast_fn, arg) {
   }
 }
 
+THREAD_STACK(mfx_tx_thd, 512);
+THREAD_FUNCTION(mfx_tx_fn, arg) {
+  static const uint8_t pattern[] = { 0xde, 0xad, 0xbe, 0xef };
+  while (1) {
+      dbg_printf("tx: %02x %02x %02x %02x\r\n",
+                 pattern[0], pattern[1], pattern[2], pattern[3]);
+    mfx_send(pattern, sizeof(pattern));
+    thread_sleep_ms(1000);
+  }
+}
+
 
 #ifdef MEGA_138K
 THREAD_STACK(gpio_status_thd, 512);
@@ -81,30 +94,6 @@ THREAD_FUNCTION(gpio_status_fn, arg) {
 }
 #endif
 
-
-// some CPU heavy task that will spit out the result every few seconds or
-// something related
-THREAD_STACK(compute_thd, 512);
-THREAD_FUNCTION(compute_fn, arg) {
-  while (1) {
-    uint32_t iters  = 500000 + (lcg_rand() % 5000000);
-    uint32_t result = 0;
-
-    uint32_t t_start = system_time_ms;
-
-    for (uint32_t i = 0; i < iters; i++) {
-      result += i * i;
-      if ((i % 1000) == 0)
-        thread_yield(); // could remove this manual yield
-    }
-
-    uint32_t elapsed = system_time_ms - t_start;
-    dbg_printf("compute result: %u, took %d ms (%d iters)\r\n",
-               result,
-               elapsed,
-               iters);
-  }
-}
 
 /* ========================== MAIN ========================= */
 /* ========================================================= */
@@ -137,13 +126,15 @@ int main(void) {
   mkthd_static(blink1_thd, blink1_fn, sizeof(blink1_thd), PRIO_NORMAL, NULL);
   mkthd_static(blink2_thd, blink2_fn, sizeof(blink2_thd), PRIO_NORMAL, NULL);
 
-#ifdef MEGA_138K
-  mkthd_static(gpio_status_thd, gpio_status_fn, sizeof(gpio_status_thd), PRIO_NORMAL, NULL);
-#endif
-
 
   dbg_printf("system_time_ms before start: %d\r\n", system_time_ms);
 
+
+  mfx_init();
+
+  mkthd_static(mfx_tx_thd, mfx_tx_fn, sizeof(mfx_tx_thd), PRIO_NORMAL, NULL);
+
+  /***************************************************************************/
   dbg_printf("starting kernel...\r\n");
   kernel_start();
 
