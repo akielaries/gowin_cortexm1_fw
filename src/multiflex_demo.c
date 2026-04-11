@@ -69,10 +69,10 @@ THREAD_STACK(mfx_tx_thd, 512);
 THREAD_FUNCTION(mfx_tx_fn, arg) {
   static const uint8_t pattern[] = { 0xde, 0xad, 0xbe, 0xef };
   while (1) {
-      dbg_printf("tx: %02x %02x %02x %02x\r\n",
-                 pattern[0], pattern[1], pattern[2], pattern[3]);
+    //dbg_printf("tx: %02x %02x %02x %02x\r\n",
+    //             pattern[0], pattern[1], pattern[2], pattern[3]);
     mfx_send(pattern, sizeof(pattern));
-    thread_sleep_ms(1000);
+    thread_sleep_ms(50);
   }
 }
 
@@ -132,7 +132,10 @@ int main(void) {
 
   mfx_init();
 
-  mkthd_static(mfx_tx_thd, mfx_tx_fn, sizeof(mfx_tx_thd), PRIO_NORMAL, NULL);
+  //mfx_loopback_test(64, 31);
+  mfx_phys_loopback_test(64, 31);
+
+  //mkthd_static(mfx_tx_thd, mfx_tx_fn, sizeof(mfx_tx_thd), PRIO_NORMAL, NULL);
 
   /***************************************************************************/
   dbg_printf("starting kernel...\r\n");
