@@ -132,8 +132,26 @@ int main(void) {
 
   mfx_init();
 
-  //mfx_loopback_test(64, 31);
-  mfx_phys_loopback_test(64, 31);
+  // streaming + software loopback (baseline, drain SM not involved)
+  mfx_loopback_test(64, 15);
+
+  // drain SM + software loopback (isolates drain SM CDC)
+  //    fail here -> drain SM / tx_byte CDC produces wrong bytes
+  mfx_drain_loopback_test(64, 15);
+
+  // streaming + physical loopback (isolates physical pin path)
+  //    fail here -> physical pad/wire path corrupts data
+  mfx_phys_streaming_test(64, 15);
+
+  // wire clock = 100 MHz / (2 * (clk_div + 1))
+  // clk_div=6  -> 100 / 14 = ~7.14 MHz
+  // clk_div=7  -> 100 / 16 =  6.25 MHz
+  // clk_div=15 -> 100 / 32 =  3.125 MHz
+  uint8_t clk_div = 0;
+  uint32_t wire_khz = 100000u / (2u * ((uint32_t)clk_div + 1u));
+  dbg_printf("phys_loopback: clk_div=%d wire_clk=%d.%03d MHz\r\n",
+             clk_div, wire_khz / 1000, wire_khz % 1000);
+  mfx_phys_loopback_test(64, clk_div);
 
   //mkthd_static(mfx_tx_thd, mfx_tx_fn, sizeof(mfx_tx_thd), PRIO_NORMAL, NULL);
 

@@ -71,6 +71,23 @@ static void print_number_u(uint32_t n) {
     }
 }
 
+static void print_float(double val, int precision) {
+  if (val < 0.0) {
+    UART_SendChar(UART1, '-');
+    val = -val;
+  }
+  uint32_t int_part = (uint32_t)val;
+  print_number_u(int_part);
+  UART_SendChar(UART1, '.');
+  double frac = val - (double)int_part;
+  for (int i = 0; i < precision; i++) {
+    frac *= 10.0;
+    int digit = (int)frac;
+    UART_SendChar(UART1, '0' + digit);
+    frac -= (double)digit;
+  }
+}
+
 static void print_number(int n) {
     if (n < 0) {
         UART_SendChar(UART1, '-');
@@ -177,6 +194,11 @@ void dbg_printf(const char* format, ...) {
                  print_hex(hex_val, padding, false); // No prefix if not explicitly asked
             }
             break;
+        }
+        case 'f': {
+          double f = va_arg(args, double);
+          print_float(f, 3);
+          break;
         }
         case '%': {
           UART_SendChar(UART1, '%');

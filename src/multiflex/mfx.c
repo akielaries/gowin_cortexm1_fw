@@ -155,6 +155,124 @@ void mfx_phys_loopback_test(uint32_t num_bytes, uint8_t clk_div) {
   mfx->ctrl |= MULTIFLEX_REGS_CTRL_ENABLE;
 }
 
+// drain SM + software loopback: isolates whether drain SM CDC produces wrong bytes.
+// if this fails, the bug is in the drain SM / tx_byte CDC, not the physical pins.
+// if this passes but mfx_phys_loopback_test fails, the bug is in the physical path.
+void mfx_drain_loopback_test(uint32_t num_bytes, uint8_t clk_div) {
+  if (num_bytes > 256) { num_bytes = 256; }
+
+  uint32_t ctrl = mfx->ctrl;
+  ctrl &= ~(MULTIFLEX_REGS_CTRL_ENABLE
+          | MULTIFLEX_REGS_CTRL_CLK_DIV_MASK);
+  ctrl |=  MULTIFLEX_REGS_CTRL_LOOPBACK
+        |  ((uint32_t)clk_div << MULTIFLEX_REGS_CTRL_CLK_DIV_SHIFT);
+  mfx->ctrl = ctrl;
+
+  mfx->error_clr = MULTIFLEX_REGS_ERROR_CLR_CLR_RX
+                 | MULTIFLEX_REGS_ERROR_CLR_CLR_TX;
+
+  mfx->ctrl |= MULTIFLEX_REGS_CTRL_ENABLE;
+
+  uint8_t txdata[256];
+  for (uint32_t i = 0; i < num_bytes; i++) {
+    txdata[i] = (uint8_t)(i & 0xFF);
+  }
+  mfx_send_buf(txdata, num_bytes);
+
+  while (mfx->status & MULTIFLEX_REGS_STATUS_TX_BUSY) {}
+
+  uint32_t err_cnt  = (mfx->error_cnt & MULTIFLEX_REGS_ERROR_CNT_RX_ERROR_COUNT_MASK)
+                      >> MULTIFLEX_REGS_ERROR_CNT_RX_ERROR_COUNT_SHIFT;
+  uint32_t locked   = (mfx->status & MULTIFLEX_REGS_STATUS_RX_LOCKED)    ? 1 : 0;
+  uint32_t syn_lost = (mfx->status & MULTIFLEX_REGS_STATUS_RX_SYNC_LOST) ? 1 : 0;
+  uint32_t rx_cnt   = mfx->rx_count & MULTIFLEX_REGS_RX_COUNT_COUNT_MASK;
+
+  dbg_printf("drain_loopback clk_div=%u bytes=%u locked=%u sync_lost=%u rx_errors=%u rx_count=%u\r\n",
+             (unsigned)clk_div, (unsigned)num_bytes,
+             (unsigned)locked, (unsigned)syn_lost, (unsigned)err_cnt, (unsigned)rx_cnt);
+
+  uint8_t rbuf[256];
+  uint32_t n = mfx_recv_buf(rbuf, rx_cnt < num_bytes ? rx_cnt : num_bytes);
+
+  uint32_t mismatches = 0;
+  for (uint32_t i = 0; i < n; i++) {
+    if (rbuf[i] != txdata[i]) { mismatches++; }
+  }
+  if (mismatches) {
+    dbg_printf("  FAIL mismatches=%u\r\n", (unsigned)mismatches);
+    for (uint32_t i = 0; i < n && i < 32; i++) {
+      if (rbuf[i] != txdata[i]) {
+        dbg_printf("  [%u] expected=0x%02x got=0x%02x\r\n",
+                   (unsigned)i, (unsigned)txdata[i], (unsigned)rbuf[i]);
+      }
+    }
+  } else {
+    dbg_printf("  PASS all %u bytes correct\r\n", (unsigned)n);
+  }
+
+  mfx->ctrl &= ~MULTIFLEX_REGS_CTRL_ENABLE;
+  mfx->ctrl |=  MULTIFLEX_REGS_CTRL_ENABLE;
+}
+
+// streaming + physical loopback: isolates whether the physical pin path corrupts data.
+// uses mfx_send_byte (TX FIFO streaming) with loopback=0 (physical mfx_rx pin).
+// if this fails but mfx_loopback_test passes, the bug is in the physical pin path.
+void mfx_phys_streaming_test(uint32_t num_bytes, uint8_t clk_div) {
+  if (num_bytes > 256) { num_bytes = 256; }
+
+  uint32_t ctrl = mfx->ctrl;
+  ctrl &= ~(MULTIFLEX_REGS_CTRL_ENABLE
+          | MULTIFLEX_REGS_CTRL_LOOPBACK_MASK
+          | MULTIFLEX_REGS_CTRL_CLK_DIV_MASK);
+  ctrl |= ((uint32_t)clk_div << MULTIFLEX_REGS_CTRL_CLK_DIV_SHIFT);
+  mfx->ctrl = ctrl;
+
+  mfx->error_clr = MULTIFLEX_REGS_ERROR_CLR_CLR_RX
+                 | MULTIFLEX_REGS_ERROR_CLR_CLR_TX;
+
+  mfx->ctrl |= MULTIFLEX_REGS_CTRL_ENABLE;
+
+  uint8_t txdata[256];
+  for (uint32_t i = 0; i < num_bytes; i++) {
+    txdata[i] = (uint8_t)(i & 0xFF);
+    mfx_send_byte(txdata[i]);
+  }
+
+  while (mfx->status & MULTIFLEX_REGS_STATUS_TX_BUSY) {}
+
+  uint32_t err_cnt  = (mfx->error_cnt & MULTIFLEX_REGS_ERROR_CNT_RX_ERROR_COUNT_MASK)
+                      >> MULTIFLEX_REGS_ERROR_CNT_RX_ERROR_COUNT_SHIFT;
+  uint32_t locked   = (mfx->status & MULTIFLEX_REGS_STATUS_RX_LOCKED)    ? 1 : 0;
+  uint32_t syn_lost = (mfx->status & MULTIFLEX_REGS_STATUS_RX_SYNC_LOST) ? 1 : 0;
+  uint32_t rx_cnt   = mfx->rx_count & MULTIFLEX_REGS_RX_COUNT_COUNT_MASK;
+
+  dbg_printf("phys_streaming clk_div=%u bytes=%u locked=%u sync_lost=%u rx_errors=%u rx_count=%u\r\n",
+             (unsigned)clk_div, (unsigned)num_bytes,
+             (unsigned)locked, (unsigned)syn_lost, (unsigned)err_cnt, (unsigned)rx_cnt);
+
+  uint8_t rbuf[256];
+  uint32_t n = mfx_recv_buf(rbuf, rx_cnt < num_bytes ? rx_cnt : num_bytes);
+
+  uint32_t mismatches = 0;
+  for (uint32_t i = 0; i < n; i++) {
+    if (rbuf[i] != txdata[i]) { mismatches++; }
+  }
+  if (mismatches) {
+    dbg_printf("  FAIL mismatches=%u\r\n", (unsigned)mismatches);
+    for (uint32_t i = 0; i < n && i < 32; i++) {
+      if (rbuf[i] != txdata[i]) {
+        dbg_printf("  [%u] expected=0x%02x got=0x%02x\r\n",
+                   (unsigned)i, (unsigned)txdata[i], (unsigned)rbuf[i]);
+      }
+    }
+  } else {
+    dbg_printf("  PASS all %u bytes correct\r\n", (unsigned)n);
+  }
+
+  mfx->ctrl &= ~(MULTIFLEX_REGS_CTRL_ENABLE | MULTIFLEX_REGS_CTRL_LOOPBACK_MASK);
+  mfx->ctrl |=   MULTIFLEX_REGS_CTRL_ENABLE;
+}
+
 // fabric loopback BER test: send incrementing bytes, count RX mismatches.
 void mfx_loopback_test(uint32_t num_bytes, uint8_t clk_div) {
   uint32_t ctrl = mfx->ctrl;
