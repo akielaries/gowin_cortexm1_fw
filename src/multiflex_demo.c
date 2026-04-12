@@ -143,12 +143,14 @@ int main(void) {
   //    fail here -> physical pad/wire path corrupts data
   mfx_phys_streaming_test(64, 15);
 
-  // wire clock = 100 MHz / (2 * (clk_div + 1))
-  // clk_div=6  -> 100 / 14 = ~7.14 MHz
-  // clk_div=7  -> 100 / 16 =  6.25 MHz
-  // clk_div=15 -> 100 / 32 =  3.125 MHz
-  uint8_t clk_div = 0;
-  uint32_t wire_khz = 100000u / (2u * ((uint32_t)clk_div + 1u));
+  // wire clock = 200 MHz / (2 * (clk_div + 1))
+  // clk_div=0  -> 200 /  2 = 100 MHz
+  // clk_div=1  -> 200 /  4 =  50 MHz
+  // clk_div=3  -> 200 /  8 =  25 MHz
+  // clk_div=6  -> 200 / 14 = ~14.28 MHz
+  // clk_div=15 -> 200 / 32 =   6.25 MHz
+  uint8_t clk_div = 1;
+  uint32_t wire_khz = 200000u / (2u * ((uint32_t)clk_div + 1u));
   dbg_printf("phys_loopback: clk_div=%d wire_clk=%d.%03d MHz\r\n",
              clk_div, wire_khz / 1000, wire_khz % 1000);
   mfx_phys_loopback_test(64, clk_div);
